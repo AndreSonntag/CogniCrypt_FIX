@@ -12,7 +12,7 @@ jobs:
            
       - restore_cache: # restore the saved cache after the first run or if `pom.xml` has changed
           # Read about caching dependencies: https://circleci.com/docs/2.0/caching/
-          key: Prototype-{{ checksum "pom.xml" }}
+          key: CogniCryptFIX-{{ checksum "pom.xml" }}
       
       - run: mvn dependency:go-offline # gets the project dependencies
       
