@@ -22,7 +22,7 @@ import crypto.rules.CryptSLRule;
  */
 public class CrySLReaderUtils {
 
-    private static final Logger logger = LogManager.getLogger(CrySLReaderUtils.class);
+	private static final Logger logger = LogManager.getLogger(CrySLReaderUtils.class.getSimpleName());
 	
 	public static List<CryptSLRule> readRulesFromBinaryFiles(final String folderPath) {
 		
@@ -39,7 +39,6 @@ public class CrySLReaderUtils {
 	}
 
 	public static CryptSLRule readRuleFromBinaryFile(final String folderPath, final String ruleNameName) throws FileNotFoundException, IOException, ClassNotFoundException {
-		logger.debug("read CrySL rule: "+ruleNameName);
 		try (ObjectInputStream in = new ObjectInputStream(
 				new FileInputStream(folderPath + "/" + ruleNameName + ".cryptslbin"));) {
 			return (CryptSLRule) in.readObject();

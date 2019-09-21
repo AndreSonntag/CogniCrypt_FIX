@@ -34,6 +34,8 @@ import soot.options.Options;
  * @date 21.09.2019
  */
 public class CryptoAnalysis {
+	
+	private static final Logger logger = LogManager.getLogger(CryptoAnalysis.class.getSimpleName());
 	private static CG DEFAULT_CALL_GRAPH = CG.CHA;
 
 	public static enum CG {
@@ -70,7 +72,7 @@ public class CryptoAnalysis {
 			runSoot();
 		}
 		catch (final Exception t) {
-//			logger.error(t);
+			logger.error(t);
 			return false;
 		}
 		return true;
@@ -107,7 +109,8 @@ public class CryptoAnalysis {
 
 		Options.v().setPhaseOption("jb", "use-original-names:true");
 		Options.v().set_output_format(Options.output_format_none);
-//		logger.info("initializing soot");
+		logger.info("initializing soot");
+
 	}
 
 	private static List<String> getIncludeList() {

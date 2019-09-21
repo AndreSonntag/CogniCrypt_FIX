@@ -1,7 +1,11 @@
 package de.upb.cognicryptfix.analysis;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Set;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Table;
@@ -16,12 +20,25 @@ import crypto.analysis.CrySLAnalysisListener;
 import crypto.analysis.EnsuredCryptSLPredicate;
 import crypto.analysis.IAnalysisSeed;
 import crypto.analysis.errors.AbstractError;
+import crypto.analysis.errors.ConstraintError;
+import crypto.analysis.errors.ForbiddenMethodError;
+import crypto.analysis.errors.ImpreciseValueExtractionError;
+import crypto.analysis.errors.IncompleteOperationError;
+import crypto.analysis.errors.NeverTypeOfError;
+import crypto.analysis.errors.PredicateContradictionError;
+import crypto.analysis.errors.RequiredPredicateError;
+import crypto.analysis.errors.TypestateError;
 import crypto.extractparameter.CallSiteWithParamIndex;
 import crypto.extractparameter.ExtractedValue;
 import crypto.interfaces.ISLConstraint;
+import crypto.rules.CryptSLComparisonConstraint;
+import crypto.rules.CryptSLConstraint;
 import crypto.rules.CryptSLPredicate;
+import crypto.rules.CryptSLValueConstraint;
+import de.upb.cognicryptfix.utils.MavenProject;
 import sync.pds.solver.nodes.Node;
 import typestate.TransitionFunction;
+
 
 /**
  * @author Andre Sonntag
@@ -29,6 +46,52 @@ import typestate.TransitionFunction;
  */
 public class CryptoAnalysisListener extends CrySLAnalysisListener{
 
+	private static final Logger logger = LogManager.getLogger(CryptoAnalysisListener.class.getSimpleName());
+	private final HashMap<String, String> projectStructure;
+	
+	public CryptoAnalysisListener(MavenProject mp) {
+		this.projectStructure = mp.getProjectStructureHashMap();
+	}
+	
+	public void reportError(AbstractError error) {
+
+		if (error instanceof ForbiddenMethodError) {
+			ForbiddenMethodError forbiddenMethError = (ForbiddenMethodError) error;
+			logger.info(forbiddenMethError.getClass().getSimpleName() + " : " + forbiddenMethError.toErrorMarkerString());
+
+		} else if (error instanceof PredicateContradictionError) {
+			PredicateContradictionError predContError = (PredicateContradictionError) error;
+			logger.info(predContError.getClass().getSimpleName() + " : " + predContError.toErrorMarkerString());
+
+		} else if (error instanceof RequiredPredicateError) {
+			RequiredPredicateError requiredPredError = (RequiredPredicateError) error;
+			logger.info(requiredPredError.getClass().getSimpleName() + " : " + requiredPredError.toErrorMarkerString());
+
+		} else if (error instanceof NeverTypeOfError) {
+			NeverTypeOfError nevTypeError = (NeverTypeOfError) error;
+			logger.info(nevTypeError.getClass().getSimpleName() + " : " + nevTypeError.toErrorMarkerString());
+
+		} else if (error instanceof ConstraintError) {
+			ConstraintError conError = (ConstraintError) error;
+			logger.info(conError.getClass().getSimpleName() + " :" + conError.toErrorMarkerString());
+		
+		} else if (error instanceof IncompleteOperationError) {
+			IncompleteOperationError incompleteOpError = (IncompleteOperationError) error;
+			logger.info(incompleteOpError.getClass().getSimpleName() + " : " + incompleteOpError.toErrorMarkerString());
+
+		} else if (error instanceof TypestateError) {
+			ForbiddenMethodError typeStatError = (ForbiddenMethodError) error;
+			logger.info(typeStatError.getClass().getSimpleName() + " : " + typeStatError.toErrorMarkerString());
+
+		} else if (error instanceof ImpreciseValueExtractionError) {
+			ImpreciseValueExtractionError impreciseValExtError = (ImpreciseValueExtractionError) error;
+			logger.info(impreciseValExtError.getClass().getSimpleName() + " : "
+					+ impreciseValExtError.toErrorMarkerString());
+		}
+		
+	}
+	
+	
 	public void afterAnalysis() {
 		// TODO Auto-generated method stub
 		
@@ -112,9 +175,5 @@ public class CryptoAnalysisListener extends CrySLAnalysisListener{
 		
 	}
 
-	public void reportError(AbstractError arg0) {
-		// TODO Auto-generated method stub
-		
-	}
-
+	
 }
