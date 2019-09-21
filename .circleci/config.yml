@@ -8,7 +8,7 @@ jobs:
       MAVEN_OPTS: -Xmx3200m
     steps:
       - checkout:     
-           path: ~/CogniCryptFIX
+           path: ~/CogniCrypt_FIX
            
       - restore_cache: # restore the saved cache after the first run or if `pom.xml` has changed
           # Read about caching dependencies: https://circleci.com/docs/2.0/caching/
