@@ -19,7 +19,7 @@ jobs:
       - save_cache: # saves the project dependencies
           paths:
             - ~/.m2
-          key: Prototype-{{ checksum "pom.xml" }}
+          key: CogniCryptFIX-{{ checksum "pom.xml" }}
       
       - run: mvn package # run the actual tests
       
