@@ -1,0 +1,30 @@
+version: 2
+jobs:
+  build:    
+    working_directory: ~/CogniCrypt_FIX/CogniCryptFIX
+    docker:
+      - image: circleci/openjdk:8-jdk-browsers
+    environment:
+      MAVEN_OPTS: -Xmx3200m
+    steps:
+      - checkout:     
+           path: ~/CogniCryptFIX
+           
+      - restore_cache: # restore the saved cache after the first run or if `pom.xml` has changed
+          # Read about caching dependencies: https://circleci.com/docs/2.0/caching/
+          key: Prototype-{{ checksum "pom.xml" }}
+      
+      - run: mvn dependency:go-offline # gets the project dependencies
+      
+      - save_cache: # saves the project dependencies
+          paths:
+            - ~/.m2
+          key: Prototype-{{ checksum "pom.xml" }}
+      
+      - run: mvn package # run the actual tests
+      
+      - store_test_results:
+          path: target/surefire-reports
+      
+      - store_artifacts:
+          path: target/CogniCryptFIX-0.0.1-SNAPSHOT.ja
