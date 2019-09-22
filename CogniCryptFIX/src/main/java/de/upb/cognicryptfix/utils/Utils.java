@@ -1,13 +1,30 @@
 package de.upb.cognicryptfix.utils;
 
+import java.util.Map;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+
+import crypto.analysis.AnalysisSeedWithSpecification;
+import crypto.extractparameter.CallSiteWithExtractedValue;
+import crypto.extractparameter.CallSiteWithParamIndex;
+import crypto.extractparameter.ExtractedValue;
 import crypto.interfaces.ISLConstraint;
 import crypto.rules.CryptSLComparisonConstraint;
 import crypto.rules.CryptSLConstraint;
 import crypto.rules.CryptSLPredicate;
 import crypto.rules.CryptSLValueConstraint;
+import soot.IntType;
+import soot.Value;
+import soot.jimple.AssignStmt;
+import soot.jimple.Constant;
+import soot.jimple.IntConstant;
+import soot.jimple.LongConstant;
+import soot.jimple.Stmt;
+import soot.jimple.StringConstant;
 
 /**
  * @author Andre Sonntag
@@ -52,4 +69,46 @@ public class Utils {
 		return builder.toString();
 		
 	}
+
+	public static String extractValueAsString(AnalysisSeedWithSpecification seed, String varName, ISLConstraint cons) {
+		
+		Multimap<CallSiteWithParamIndex, ExtractedValue> parsAndVals = seed.getParameterAnalysis().getCollectedValues();   
+		Map<String, CallSiteWithExtractedValue> varVal = Maps.newHashMap();
+		for (CallSiteWithParamIndex wrappedCallSite : parsAndVals.keySet()) {
+			final Stmt callSite = wrappedCallSite.stmt().getUnit().get();
+
+			for (ExtractedValue wrappedAllocSite : parsAndVals.get(wrappedCallSite)) {
+				final Stmt allocSite = wrappedAllocSite.stmt().getUnit().get();
+				
+				if (wrappedCallSite.getVarName().equals(varName)) {
+					if (callSite.equals(allocSite)) {
+						varVal.put(retrieveConstantFromValue(callSite.getInvokeExpr().getArg(wrappedCallSite.getIndex())), new CallSiteWithExtractedValue(wrappedCallSite, wrappedAllocSite));
+					} else if (allocSite instanceof AssignStmt) {
+						if (wrappedAllocSite.getValue() instanceof Constant) {
+							varVal.put(retrieveConstantFromValue(wrappedAllocSite.getValue()), new CallSiteWithExtractedValue(wrappedCallSite, wrappedAllocSite));
+						}
+					}
+				}
+			}
+		}
+		
+		String strValue = "";
+		for (String key : varVal.keySet()) {
+			strValue = key;
+		}
+		return strValue;
+	}
+	
+	private static String retrieveConstantFromValue(Value val) {
+		if (val instanceof StringConstant) {
+			return ((StringConstant) val).value;
+		} else if (val instanceof IntConstant || val.getType() instanceof IntType) {
+			return val.toString();
+		} else if (val instanceof LongConstant) {
+				return val.toString().replaceAll("L", "");
+		} else {
+			return "";
+		}
+	}
+
 }
