@@ -36,7 +36,7 @@ public class HeadlessRepairer {
 
 		MavenProject analysingProject = Utils.createAndCompile(applicationClassPath);
 		CryptoAnalysis analysis = new CryptoAnalysis();
-		CryptoAnalysisListener listener = new CryptoAnalysisListener(analysingProject);
+		CryptoAnalysisListener listener = new CryptoAnalysisListener();
 		analysis.runSoot(analysingProject, listener);
 		
 	}

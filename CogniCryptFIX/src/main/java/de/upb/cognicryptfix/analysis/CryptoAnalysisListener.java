@@ -35,6 +35,8 @@ import crypto.rules.CryptSLComparisonConstraint;
 import crypto.rules.CryptSLConstraint;
 import crypto.rules.CryptSLPredicate;
 import crypto.rules.CryptSLValueConstraint;
+import de.upb.cognicryptfix.patcher.IPatcher;
+import de.upb.cognicryptfix.patcher.JimplePatcher;
 import de.upb.cognicryptfix.utils.MavenProject;
 import sync.pds.solver.nodes.Node;
 import typestate.TransitionFunction;
@@ -47,48 +49,13 @@ import typestate.TransitionFunction;
 public class CryptoAnalysisListener extends CrySLAnalysisListener{
 
 	private static final Logger logger = LogManager.getLogger(CryptoAnalysisListener.class.getSimpleName());
-	private final HashMap<String, String> projectStructure;
 	
-	public CryptoAnalysisListener(MavenProject mp) {
-		this.projectStructure = mp.getProjectStructureHashMap();
+	public CryptoAnalysisListener() {
 	}
 	
 	public void reportError(AbstractError error) {
-
-		if (error instanceof ForbiddenMethodError) {
-			ForbiddenMethodError forbiddenMethError = (ForbiddenMethodError) error;
-			logger.info(forbiddenMethError.getClass().getSimpleName() + " : " + forbiddenMethError.toErrorMarkerString());
-
-		} else if (error instanceof PredicateContradictionError) {
-			PredicateContradictionError predContError = (PredicateContradictionError) error;
-			logger.info(predContError.getClass().getSimpleName() + " : " + predContError.toErrorMarkerString());
-
-		} else if (error instanceof RequiredPredicateError) {
-			RequiredPredicateError requiredPredError = (RequiredPredicateError) error;
-			logger.info(requiredPredError.getClass().getSimpleName() + " : " + requiredPredError.toErrorMarkerString());
-
-		} else if (error instanceof NeverTypeOfError) {
-			NeverTypeOfError nevTypeError = (NeverTypeOfError) error;
-			logger.info(nevTypeError.getClass().getSimpleName() + " : " + nevTypeError.toErrorMarkerString());
-
-		} else if (error instanceof ConstraintError) {
-			ConstraintError conError = (ConstraintError) error;
-			logger.info(conError.getClass().getSimpleName() + " :" + conError.toErrorMarkerString());
-		
-		} else if (error instanceof IncompleteOperationError) {
-			IncompleteOperationError incompleteOpError = (IncompleteOperationError) error;
-			logger.info(incompleteOpError.getClass().getSimpleName() + " : " + incompleteOpError.toErrorMarkerString());
-
-		} else if (error instanceof TypestateError) {
-			ForbiddenMethodError typeStatError = (ForbiddenMethodError) error;
-			logger.info(typeStatError.getClass().getSimpleName() + " : " + typeStatError.toErrorMarkerString());
-
-		} else if (error instanceof ImpreciseValueExtractionError) {
-			ImpreciseValueExtractionError impreciseValExtError = (ImpreciseValueExtractionError) error;
-			logger.info(impreciseValExtError.getClass().getSimpleName() + " : "
-					+ impreciseValExtError.toErrorMarkerString());
-		}
-		
+		IPatcher patcher = new JimplePatcher();
+		patcher.getPatchedClass(error);
 	}
 	
 	
