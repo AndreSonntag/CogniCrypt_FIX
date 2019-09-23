@@ -1,6 +1,5 @@
 package de.upb.cognicryptfix.patcher.patches;
 
-import java.io.IOException;
 import java.util.Iterator;
 
 import javax.script.ScriptException;
@@ -12,10 +11,9 @@ import org.apache.logging.log4j.Logger;
 
 import crypto.analysis.errors.ConstraintError;
 import crypto.rules.CryptSLRule;
-import de.upb.cognicryptfix.utils.PrimitiveConstraint;
+import de.upb.cognicryptfix.extractor.constraints.IConstraint;
+import de.upb.cognicryptfix.extractor.constraints.ValueConstraint;
 import soot.Body;
-import soot.Scene;
-import soot.SootClass;
 import soot.jimple.IntConstant;
 import soot.jimple.StringConstant;
 import soot.jimple.internal.JAssignStmt;
@@ -33,7 +31,7 @@ public class PrimitiveConstraintPatch extends AbstractPatch {
 	private static final Logger logger = LogManager.getLogger(PrimitiveConstraintPatch.class.getSimpleName());
 
 	private final ConstraintError error;
-	private final PrimitiveConstraint primCon;
+	private final IConstraint constraint;
 	private CryptSLRule violatedCrySLRule;
 	private String crySLVarName;
 	private String jimpleVarName;
@@ -42,11 +40,10 @@ public class PrimitiveConstraintPatch extends AbstractPatch {
 	private int brokenVarIndex;
 	private String patchValue;
 	
-	public PrimitiveConstraintPatch(ConstraintError error, PrimitiveConstraint primCon) {
+	public PrimitiveConstraintPatch(ConstraintError error, IConstraint constraint) {
 		this.error = error;
-		this.primCon = primCon;
+		this.constraint = constraint;
 		setErrorInformation();
-		logger.info(toString());		
 	}
 	
 	
@@ -61,6 +58,7 @@ public class PrimitiveConstraintPatch extends AbstractPatch {
 				JAssignStmt var = (JAssignStmt) o;
 				if(var.leftBox.getValue().toString().equals(jimpleVarName)) {
 					
+					//TODO: is boolean, char, etc.
 					if(StringUtils.isNumeric(patchValue)) {
 						var.rightBox.setValue(IntConstant.v(Integer.parseInt(patchValue)));
 					}
@@ -74,22 +72,20 @@ public class PrimitiveConstraintPatch extends AbstractPatch {
 		return methodBody;
 	}
 	
-	/**
-	 * <p>
-	 * This method extract all required information
-	 * </p>
-	 * 
-	 * @throws IOException
-	 * @throws ClassNotFoundException
-	 */
 	private void setErrorInformation(){
 		this.violatedCrySLRule = error.getRule();
 		this.crySLVarName = error.getCallSiteWithExtractedValue().getCallSite().getVarName();
 		this.brokenVarIndex = error.getCallSiteWithExtractedValue().getCallSite().getIndex();
 		this.brokenJimpleCode = error.getErrorLocation().getUnit().get().getInvokeExpr().toString();
 		this.jimpleVarName = error.getErrorLocation().getUnit().get().getInvokeExpr().getArgs().get(brokenVarIndex).toString();
-		this.jimpleVarValue = getRealValue(crySLVarName);
-		this.patchValue = getExpectedConstraintValue(crySLVarName);
+		this.jimpleVarValue = getRealValue();
+		
+		if(constraint instanceof ValueConstraint) {
+			this.patchValue = getRealValue()+getExpectedConstraintValue();
+		}
+		else {
+			this.patchValue = getExpectedConstraintValue();
+		}
 	}
 	
 	@Override
@@ -108,21 +104,21 @@ public class PrimitiveConstraintPatch extends AbstractPatch {
 	}
 
 	
-	private String getExpectedConstraintValue(String crySLVar) {
+	private String getExpectedConstraintValue() {
 		String expectedValue = "";
 		try {
-			expectedValue = primCon.getExpectedValueOfVar(crySLVar);
-		} catch (ScriptException e) {
+			expectedValue = constraint.getExpectedConstraintValue();
+		} catch (Exception e) {
 			logger.error(e);
 		}
 		return expectedValue;
 	}
 	
-	private String getRealValue(String crySLVar) {
+	private String getRealValue() {
 		String expectedValue = "";
 		try {
-			expectedValue = primCon.getRealValueOfVar(crySLVar);
-		} catch (ScriptException e) {
+			expectedValue = constraint.getUsedValue();
+		} catch (Exception e) {
 			logger.error(e);
 		}
 		return expectedValue;

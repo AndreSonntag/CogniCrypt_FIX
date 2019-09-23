@@ -1,29 +1,15 @@
 package de.upb.cognicryptfix.extractor;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-
 import crypto.analysis.AnalysisSeedWithSpecification;
-import crypto.constraints.ConstraintSolver;
-import crypto.constraints.ConstraintSolver.EvaluableConstraint;
-import crypto.extractparameter.CallSiteWithExtractedValue;
 import crypto.interfaces.ISLConstraint;
 import crypto.rules.CryptSLArithmeticConstraint;
-import crypto.rules.CryptSLArithmeticConstraint.ArithOp;
 import crypto.rules.CryptSLComparisonConstraint;
-import crypto.rules.CryptSLComparisonConstraint.CompOp;
+import de.upb.cognicryptfix.extractor.constraints.ComparisonConstraint;
 import de.upb.cognicryptfix.utils.Pair;
-import de.upb.cognicryptfix.utils.PrimitiveConstraint;
 import de.upb.cognicryptfix.utils.Utils;
 
 /*
@@ -58,21 +44,21 @@ import de.upb.cognicryptfix.utils.Utils;
 public class CryptSLComparsionConstraintExtractor{
 
 	private static final Logger logger = LogManager.getLogger(CryptSLComparsionConstraintExtractor.class.getSimpleName());
-	private final ISLConstraint islConstraint;
+	private final CryptSLComparisonConstraint constraint;
 	private AnalysisSeedWithSpecification seed;
 
-	public CryptSLComparsionConstraintExtractor(AnalysisSeedWithSpecification seed, ISLConstraint constraint) {
-		this.islConstraint = constraint;
+	public CryptSLComparsionConstraintExtractor(AnalysisSeedWithSpecification seed, CryptSLComparisonConstraint constraint) {
+		this.constraint = constraint;
 		this.seed = seed;
 	}
 
-	public PrimitiveConstraint extract() {
-		PrimitiveConstraint sCon = extractSimpleConstraint((CryptSLComparisonConstraint) islConstraint);
-		return sCon;
+	public ComparisonConstraint extract() {
+		ComparisonConstraint compCon = extractSimpleConstraint(constraint);
+		return compCon;
 	}
 	
-	private PrimitiveConstraint extractSimpleConstraint(CryptSLComparisonConstraint compCon) {
-		PrimitiveConstraint sc = new PrimitiveConstraint();
+	private ComparisonConstraint extractSimpleConstraint(CryptSLComparisonConstraint compCon) {
+		ComparisonConstraint sc = new ComparisonConstraint();
 		sc.setOperator(compCon.getOperator());
 		Pair<Pair>left = extractPairs(compCon.getLeft());
 		Pair<Pair>right = extractPairs(compCon.getRight());
@@ -94,7 +80,7 @@ public class CryptSLComparsionConstraintExtractor{
 		}
 		else {
 			leftVarName = left;
-			leftVarValue = Utils.extractValueAsString(seed, leftVarName, islConstraint);
+			leftVarValue = Utils.extractValueAsString(seed, leftVarName, constraint).keySet().iterator().next().toString();
 		}
 		Pair<String> leftPair = new Pair<String>(leftVarName, leftVarValue);
 		
@@ -109,7 +95,7 @@ public class CryptSLComparsionConstraintExtractor{
 		}
 		else {
 			rightVarName = right;
-			rightVarValue = Utils.extractValueAsString(seed, rightVarName, islConstraint);
+			rightVarValue = Utils.extractValueAsString(seed, rightVarName, constraint).keySet().iterator().next().toString();
 		}
 		
 		Pair<String> rightPair = new Pair<String>(rightVarName, rightVarValue);

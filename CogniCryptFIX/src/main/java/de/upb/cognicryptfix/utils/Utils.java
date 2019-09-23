@@ -70,7 +70,7 @@ public class Utils {
 		
 	}
 
-	public static String extractValueAsString(AnalysisSeedWithSpecification seed, String varName, ISLConstraint cons) {
+	public static Map<String, CallSiteWithExtractedValue> extractValueAsString(AnalysisSeedWithSpecification seed, String varName, ISLConstraint cons) {
 		
 		Multimap<CallSiteWithParamIndex, ExtractedValue> parsAndVals = seed.getParameterAnalysis().getCollectedValues();   
 		Map<String, CallSiteWithExtractedValue> varVal = Maps.newHashMap();
@@ -92,11 +92,7 @@ public class Utils {
 			}
 		}
 		
-		String strValue = "";
-		for (String key : varVal.keySet()) {
-			strValue = key;
-		}
-		return strValue;
+		return varVal;
 	}
 	
 	private static String retrieveConstantFromValue(Value val) {
