@@ -9,7 +9,7 @@
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<java.version>1.8</java.version>
-		<junit.version>3.8.1</junit.version>
+		<junit.version>4.12</junit.version>
 		<cryptoanalysis.version>2.5</cryptoanalysis.version>
 		<guava.version>28.1-jre</guava.version>
 		<soot.version>3.3.0</soot.version>
