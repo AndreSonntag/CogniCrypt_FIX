@@ -70,7 +70,7 @@ public class Utils {
 		
 	}
 
-	public static Map<String, CallSiteWithExtractedValue> extractValueAsString(AnalysisSeedWithSpecification seed, String varName, ISLConstraint cons) {
+	public static Map<String, CallSiteWithExtractedValue> extractValueAsString(AnalysisSeedWithSpecification seed, String varName) {
 		
 		Multimap<CallSiteWithParamIndex, ExtractedValue> parsAndVals = seed.getParameterAnalysis().getCollectedValues();   
 		Map<String, CallSiteWithExtractedValue> varVal = Maps.newHashMap();
