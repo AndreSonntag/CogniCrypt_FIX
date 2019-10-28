@@ -13,6 +13,7 @@ import crypto.analysis.AnalysisSeedWithSpecification;
 import crypto.analysis.CrySLResultsReporter;
 import crypto.analysis.errors.AbstractError;
 import crypto.analysis.errors.ConstraintError;
+import crypto.analysis.errors.NeverTypeOfError;
 import crypto.constraints.ConstraintSolver;
 import crypto.interfaces.ISLConstraint;
 import crypto.rules.CryptSLComparisonConstraint;
@@ -20,9 +21,12 @@ import crypto.rules.CryptSLPredicate;
 import crypto.rules.CryptSLValueConstraint;
 import de.upb.cognicryptfix.analysis.CryptoAnalysisListener;
 import de.upb.cognicryptfix.extractor.CryptSLComparsionConstraintExtractor;
+import de.upb.cognicryptfix.extractor.CryptSLPredicateExtractor;
 import de.upb.cognicryptfix.extractor.CryptSLValueConstraintExtractor;
 import de.upb.cognicryptfix.extractor.constraints.ComparisonConstraint;
+import de.upb.cognicryptfix.extractor.constraints.PredicateConstraint;
 import de.upb.cognicryptfix.extractor.constraints.ValueConstraint;
+import de.upb.cognicryptfix.patcher.patches.NeverTypeOfPatch;
 import de.upb.cognicryptfix.patcher.patches.PrimitiveConstraintPatch;
 import soot.Body;
 import soot.SootClass;
@@ -50,7 +54,7 @@ public class JimplePatcher implements IPatcher{
 
 		AnalysisSeedWithSpecification seed = (AnalysisSeedWithSpecification)error.getObjectLocation();
 		seed.execute();
-		
+		//seed.getParameterAnalysis().getCollectedValues()
 		Collection<Statement> collectedCalls = new HashSet<Statement>();
 		collectedCalls.add(error.getErrorLocation());		
 
@@ -72,8 +76,23 @@ public class JimplePatcher implements IPatcher{
 	}
 	
 	private Body createPatch(AbstractError error) {
-		Body patchedJimpleBody = null;
-		if (error instanceof ConstraintError) {
+		Body patchedJimpleBody = error.getErrorLocation().getMethod().getActiveBody();
+		
+		if (error instanceof NeverTypeOfError) {
+			NeverTypeOfError nTypeError = (NeverTypeOfError) error;
+			AnalysisSeedWithSpecification seed = (AnalysisSeedWithSpecification) nTypeError.getObjectLocation();
+
+			CryptSLPredicateExtractor extractor = new CryptSLPredicateExtractor(seed, (CryptSLPredicate) nTypeError.getBrokenConstraint());
+			PredicateConstraint predCon = extractor.extract();
+			
+			NeverTypeOfPatch patch = new NeverTypeOfPatch(nTypeError, predCon);
+			patchedJimpleBody = patch.getPatch();
+			error.getErrorLocation().getMethod().setActiveBody(patchedJimpleBody);
+			verifyPatch((ConstraintError) error);
+
+			
+		}
+		else if (error instanceof ConstraintError) {
 			ConstraintError conError = (ConstraintError) error;
 			ISLConstraint brokenCon = conError.getBrokenConstraint();
 			//logger.info(conError.getClass().getSimpleName() +"_"+brokenCon.getClass().getSimpleName()+" :" + conError.toErrorMarkerString());
@@ -82,24 +101,33 @@ public class JimplePatcher implements IPatcher{
 				if(brokenCon instanceof CryptSLComparisonConstraint) {
 					logger.info("Create patch for "+conError.getClass().getSimpleName() +"_"+brokenCon.getClass().getSimpleName()+" :" + conError.toErrorMarkerString());
 
-					CryptSLComparsionConstraintExtractor extractor = new CryptSLComparsionConstraintExtractor(seed,(CryptSLComparisonConstraint)brokenCon);
+					CryptSLComparsionConstraintExtractor extractor = new CryptSLComparsionConstraintExtractor(seed , (CryptSLComparisonConstraint) brokenCon);
 					ComparisonConstraint primCon = extractor.extract();
 					PrimitiveConstraintPatch patch = new PrimitiveConstraintPatch(conError, primCon);
 					patchedJimpleBody = patch.getPatch();
 					error.getErrorLocation().getMethod().setActiveBody(patchedJimpleBody);
+					logger.info(patch.toString());
 					verifyPatch(conError);
 				}
 				if(brokenCon instanceof CryptSLValueConstraint) {
-					
-					CryptSLValueConstraintExtractor extractor = new CryptSLValueConstraintExtractor(seed, (CryptSLValueConstraint)brokenCon);
+					logger.info("Create patch for "+conError.getClass().getSimpleName() +"_"+brokenCon.getClass().getSimpleName()+" :" + conError.toErrorMarkerString());
+
+					CryptSLValueConstraintExtractor extractor = new CryptSLValueConstraintExtractor(seed, (CryptSLValueConstraint) brokenCon);
 					ValueConstraint valCon = extractor.extract();
 					PrimitiveConstraintPatch patch = new PrimitiveConstraintPatch(conError, valCon);
 					patchedJimpleBody = patch.getPatch();
 					error.getErrorLocation().getMethod().setActiveBody(patchedJimpleBody);
+					logger.info(patch.toString());
 					verifyPatch(conError);
 				}
 				if(brokenCon instanceof CryptSLPredicate) {
-					//TODO: NeverTypeOfError
+					
+					if(!(conError instanceof NeverTypeOfError)) {
+						logger.info("Create patch for "+conError.getClass().getSimpleName() +"_"+brokenCon.getClass().getSimpleName()+" :" + conError.toErrorMarkerString());
+						CryptSLPredicateExtractor extractor = new CryptSLPredicateExtractor(seed, (CryptSLPredicate) brokenCon);
+						extractor.extract();
+					}
+					
 				}
 				
 		}
