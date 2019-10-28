@@ -51,6 +51,8 @@ public class PrimitiveConstraintPatch extends AbstractPatch {
 	public Body getPatch() {
 		Body methodBody = error.getErrorLocation().getMethod().getActiveBody();
 		UnitGraph uGraph = new ExceptionalUnitGraph(methodBody); 
+		
+		//inprecise solution ...
 		Iterator i = uGraph.iterator();
 		while(i.hasNext()) {
 			Object o = i.next();
@@ -72,6 +74,7 @@ public class PrimitiveConstraintPatch extends AbstractPatch {
 		return methodBody;
 	}
 	
+	
 	private void setErrorInformation(){
 		this.violatedCrySLRule = error.getRule();
 		this.crySLVarName = error.getCallSiteWithExtractedValue().getCallSite().getVarName();
@@ -79,19 +82,13 @@ public class PrimitiveConstraintPatch extends AbstractPatch {
 		this.brokenJimpleCode = error.getErrorLocation().getUnit().get().getInvokeExpr().toString();
 		this.jimpleVarName = error.getErrorLocation().getUnit().get().getInvokeExpr().getArgs().get(brokenVarIndex).toString();
 		this.jimpleVarValue = getRealValue();
-		
-		if(constraint instanceof ValueConstraint) {
-			this.patchValue = getRealValue()+getExpectedConstraintValue();
-		}
-		else {
-			this.patchValue = getExpectedConstraintValue();
-		}
+		this.patchValue = getExpectedConstraintValue();
 	}
 	
 	@Override
 	public String toString() {
 		StringBuilder strBuilder = new StringBuilder();
-		strBuilder.append("\nConstraintPatch [\n");
+		strBuilder.append("\nPrimitiveConstraintPatch [\n");
 		strBuilder.append("error = " + error.toString() + "\n");
 		strBuilder.append("violatedCrySLRule = " + violatedCrySLRule.getClassName() + "\n");
 		strBuilder.append("crySLVarName = " + crySLVarName + "\n");
@@ -102,7 +99,6 @@ public class PrimitiveConstraintPatch extends AbstractPatch {
 		strBuilder.append("new patch value for jimple Variable "+ jimpleVarName +" = "+ patchValue + "\n");
 		return strBuilder.toString();
 	}
-
 	
 	private String getExpectedConstraintValue() {
 		String expectedValue = "";

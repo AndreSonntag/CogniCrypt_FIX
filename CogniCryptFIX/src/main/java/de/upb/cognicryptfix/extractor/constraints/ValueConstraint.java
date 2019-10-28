@@ -10,12 +10,14 @@ public class ValueConstraint implements IConstraint{
 	private static final Logger logger = LogManager.getLogger(ValueConstraint.class.getSimpleName());
 	
 	private String usedValue;
-	private List<String> expectedValueList;
+	private List<String> expectedConstraintValueList;
+	private boolean replacing;
 	
-	public ValueConstraint(String usedValue, List<String> expectedValueList) {
+	public ValueConstraint(String usedValue, List<String> expectedValueList, boolean replacing) {
 		super();
 		this.usedValue = usedValue;
-		this.expectedValueList = expectedValueList;
+		this.expectedConstraintValueList = expectedValueList;
+		this.replacing = replacing;
 	}
 
 	@Override
@@ -25,12 +27,15 @@ public class ValueConstraint implements IConstraint{
 
 	@Override
 	public String getExpectedConstraintValue() throws Exception {
-		return expectedValueList.get(0);
+		return replacing == true ? usedValue+expectedConstraintValueList.get(0) : expectedConstraintValueList.get(0);
 	}
 
 	public List<String> getExpectedValueList() {
-		return expectedValueList;
+		return expectedConstraintValueList;
 	}
+
+	
+	
 	
 	
 

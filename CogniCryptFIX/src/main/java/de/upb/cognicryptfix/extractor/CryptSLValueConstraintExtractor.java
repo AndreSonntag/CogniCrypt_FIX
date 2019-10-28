@@ -2,6 +2,9 @@ package de.upb.cognicryptfix.extractor;
 
 import java.util.HashMap;
 import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+
 import crypto.analysis.AnalysisSeedWithSpecification;
 import crypto.rules.CryptSLSplitter;
 import crypto.rules.CryptSLValueConstraint;
@@ -27,40 +30,14 @@ public class CryptSLValueConstraintExtractor{
 		CryptSLValueConstraint valCon = constraint;
 		CryptSLSplitter splitter = valCon.getVar().getSplitter();
 		
-		String usedValue = Utils.extractValueAsString(seed, valCon.getVar().getVarName(), valCon).keySet().iterator().next().toString();
+		String usedValue = Utils.extractValueAsString(seed, valCon.getVar().getVarName()).keySet().iterator().next().toString();
 		List<String> expectedValueList = valCon.getValueRange();
 		
-		return new ValueConstraint(usedValue+splitter.getSplitter(), expectedValueList);
+		if(splitter == null) {
+			return new ValueConstraint(usedValue, expectedValueList, false);
+		}else {	
+			return new ValueConstraint(usedValue+splitter.getSplitter(), expectedValueList, true); 
+		}		
 	}
 	
-//	private List<Entry<String, CallSiteWithExtractedValue>> getValFromVar(CryptSLObject var, ISLConstraint cons) {
-//		final String varName = var.getVarName();
-//		final Map<String, CallSiteWithExtractedValue> valueCollection = Utils.extractValueAsString(seed, varName, cons);
-//		List<Entry<String, CallSiteWithExtractedValue>> vals = new ArrayList<>();
-//		if (valueCollection.isEmpty()) {
-//			return vals;
-//		}
-//		for (Entry<String, CallSiteWithExtractedValue> e : valueCollection.entrySet()) {
-//			CryptSLSplitter splitter = var.getSplitter();
-//			final CallSiteWithExtractedValue location = e.getValue();
-//			String val = e.getKey();
-//			if (splitter != null) {
-//				int ind = splitter.getIndex();
-//				String splitElement = splitter.getSplitter();
-//				if (ind > 0) {
-//					String[] splits = val.split(splitElement);
-//					if (splits.length > ind) {
-//						vals.add(new AbstractMap.SimpleEntry<>(splits[ind], location));
-//					} else {
-//						vals.add(new AbstractMap.SimpleEntry<>("", location));
-//					}
-//				} else {
-//					vals.add(new AbstractMap.SimpleEntry<>(val.split(splitElement)[ind], location));
-//				}
-//			} else {
-//				vals.add(new AbstractMap.SimpleEntry<>(val, location));
-//			}
-//		}
-//		return vals;
-//	}	
 }
