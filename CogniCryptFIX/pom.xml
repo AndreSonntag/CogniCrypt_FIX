@@ -15,6 +15,7 @@
 		<soot.version>3.3.0</soot.version>
 		<cryptsl.version>1.0.0-SNAPSHOT</cryptsl.version>
 		<soot.version>3.3.0</soot.version>
+ 	 	<spdsVersion>2.4-SNAPSHOT</spdsVersion>		
 	</properties>
 
 	<build>
@@ -32,6 +33,11 @@
 	</build>
 
 	<dependencies>
+		<dependency>
+			<groupId>de.fraunhofer.iem</groupId>
+			<artifactId>idealPDS</artifactId>
+			<version>${spdsVersion}</version>
+		</dependency>
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
