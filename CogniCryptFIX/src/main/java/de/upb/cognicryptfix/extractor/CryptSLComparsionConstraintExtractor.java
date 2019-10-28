@@ -80,7 +80,7 @@ public class CryptSLComparsionConstraintExtractor{
 		}
 		else {
 			leftVarName = left;
-			leftVarValue = Utils.extractValueAsString(seed, leftVarName, constraint).keySet().iterator().next().toString();
+			leftVarValue = Utils.extractValueAsString(seed, leftVarName).keySet().iterator().next().toString();
 		}
 		Pair<String> leftPair = new Pair<String>(leftVarName, leftVarValue);
 		
@@ -95,7 +95,7 @@ public class CryptSLComparsionConstraintExtractor{
 		}
 		else {
 			rightVarName = right;
-			rightVarValue = Utils.extractValueAsString(seed, rightVarName, constraint).keySet().iterator().next().toString();
+			rightVarValue = Utils.extractValueAsString(seed, rightVarName).keySet().iterator().next().toString();
 		}
 		
 		Pair<String> rightPair = new Pair<String>(rightVarName, rightVarValue);
