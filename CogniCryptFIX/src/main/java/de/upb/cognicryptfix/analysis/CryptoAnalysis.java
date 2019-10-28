@@ -36,7 +36,8 @@ public class CryptoAnalysis {
 	
 	private static final Logger logger = LogManager.getLogger(CryptoAnalysis.class.getSimpleName());
 	private static CG DEFAULT_CALL_GRAPH = CG.CHA;
-
+	public static CryptoScanner staticScanner = null;
+	
 	public static enum CG {
 		CHA, SPARK_LIBRARY, SPARK
 	}
@@ -57,6 +58,7 @@ public class CryptoAnalysis {
 
 
 				};
+				staticScanner = scanner;
 				scanner.getAnalysisListener().addReportListener(listener);
 				scanner.scan(CrySLReaderUtils.readRulesFromBinaryFiles(Constants.serializedCrySLRulePath));
 			}
