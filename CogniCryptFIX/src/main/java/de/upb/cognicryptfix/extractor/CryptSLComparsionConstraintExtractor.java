@@ -67,7 +67,7 @@ public class CryptSLComparsionConstraintExtractor{
 		return sc;
 	}
 		
-	//TODO: new method
+	//TODO: replace redundant code by new method
 	private Pair<Pair> extractPairs(CryptSLArithmeticConstraint artihCon) {
 			
 		String left = artihCon.getLeft().getName();
