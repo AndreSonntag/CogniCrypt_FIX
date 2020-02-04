@@ -1,7 +1,6 @@
 package de.upb.cognicryptfix.analysis;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Set;
 
 import org.apache.logging.log4j.LogManager;
@@ -17,27 +16,15 @@ import boomerang.jimple.Val;
 import boomerang.results.ForwardBoomerangResults;
 import crypto.analysis.AnalysisSeedWithSpecification;
 import crypto.analysis.CrySLAnalysisListener;
-import crypto.analysis.EnsuredCryptSLPredicate;
+import crypto.analysis.EnsuredCrySLPredicate;
 import crypto.analysis.IAnalysisSeed;
 import crypto.analysis.errors.AbstractError;
-import crypto.analysis.errors.ConstraintError;
-import crypto.analysis.errors.ForbiddenMethodError;
-import crypto.analysis.errors.ImpreciseValueExtractionError;
-import crypto.analysis.errors.IncompleteOperationError;
-import crypto.analysis.errors.NeverTypeOfError;
-import crypto.analysis.errors.PredicateContradictionError;
-import crypto.analysis.errors.RequiredPredicateError;
-import crypto.analysis.errors.TypestateError;
 import crypto.extractparameter.CallSiteWithParamIndex;
 import crypto.extractparameter.ExtractedValue;
 import crypto.interfaces.ISLConstraint;
-import crypto.rules.CryptSLComparisonConstraint;
-import crypto.rules.CryptSLConstraint;
-import crypto.rules.CryptSLPredicate;
-import crypto.rules.CryptSLValueConstraint;
+import crypto.rules.CrySLPredicate;
 import de.upb.cognicryptfix.patcher.IPatcher;
 import de.upb.cognicryptfix.patcher.JimplePatcher;
-import de.upb.cognicryptfix.utils.MavenProject;
 import sync.pds.solver.nodes.Node;
 import typestate.TransitionFunction;
 
@@ -99,12 +86,6 @@ public class CryptoAnalysisListener extends CrySLAnalysisListener{
 		
 	}
 
-	public void ensuredPredicates(Table<Statement, Val, Set<EnsuredCryptSLPredicate>> arg0,
-			Table<Statement, IAnalysisSeed, Set<CryptSLPredicate>> arg1,
-			Table<Statement, IAnalysisSeed, Set<CryptSLPredicate>> arg2) {
-		// TODO Auto-generated method stub
-		
-	}
 
 	public void seedStarted(IAnalysisSeed arg0) {
 		// TODO Auto-generated method stub
@@ -138,6 +119,20 @@ public class CryptoAnalysisListener extends CrySLAnalysisListener{
 	}
 
 	public void onSeedTimeout(Node<Statement, Val> arg0) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void ensuredPredicates(Table<Statement, Val, Set<EnsuredCrySLPredicate>> arg0,
+			Table<Statement, IAnalysisSeed, Set<CrySLPredicate>> arg1,
+			Table<Statement, IAnalysisSeed, Set<CrySLPredicate>> arg2) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void addProgress(int arg0, int arg1) {
 		// TODO Auto-generated method stub
 		
 	}

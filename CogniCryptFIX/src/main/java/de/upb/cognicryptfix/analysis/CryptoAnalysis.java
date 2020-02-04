@@ -15,7 +15,7 @@ import boomerang.callgraph.ObservableICFG;
 import boomerang.preanalysis.BoomerangPretransformer;
 import crypto.analysis.CrySLAnalysisListener;
 import crypto.analysis.CryptoScanner;
-import crypto.rules.CryptSLRule;
+import crypto.rules.CrySLRule;
 import de.upb.cognicryptfix.Constants;
 import de.upb.cognicryptfix.utils.CrySLReaderUtils;
 import de.upb.cognicryptfix.utils.MavenProject;
@@ -55,12 +55,10 @@ public class CryptoAnalysis {
 					public ObservableICFG<Unit, SootMethod> icfg() {
 						return icfg;
 					}
-
-
 				};
 				staticScanner = scanner;
 				scanner.getAnalysisListener().addReportListener(listener);
-				scanner.scan(CrySLReaderUtils.readRulesFromBinaryFiles(Constants.serializedCrySLRulePath));
+				scanner.scan(CrySLReaderUtils.readRulesFromSourceFiles(Constants.crySLRulePath));
 			}
 		};
 	}
@@ -128,10 +126,10 @@ public class CryptoAnalysis {
 		includeList.add("java.lang.StringIndexOutOfBoundsException");
 		return includeList;
 	}
-
+	
 	private static List<String> getExcludeList() {
 		final List<String> excludeList = new LinkedList<String>();
-		for (final CryptSLRule r : CrySLReaderUtils.readRulesFromBinaryFiles(Constants.serializedCrySLRulePath)) {
+		for (final CrySLRule r : CrySLReaderUtils.readRulesFromSourceFiles(Constants.crySLRulePath)) {
 			excludeList.add(crypto.Utils.getFullyQualifiedName(r));
 		}
 		return excludeList;

@@ -13,7 +13,6 @@ public class Constants {
 	public static final String lineSeparator = System.getProperty("line.separator");
 	
 	//CrySL related
-	public static final String serializedCrySLRulePath = Constants.class.getResource("/SerializedCrySLRules/").getPath();
 	public static final String crySLRulePath = Constants.class.getResource("/CrySLRules/").getPath();
 
 	
