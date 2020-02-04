@@ -10,7 +10,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<java.version>1.8</java.version>
 		<junit.version>4.12</junit.version>
-		<cryptoanalysis.version>2.5</cryptoanalysis.version>
+		<cryptoanalysis.version>2.7-SNAPSHOT</cryptoanalysis.version>
 		<guava.version>28.1-jre</guava.version>
 		<soot.version>3.3.0</soot.version>
 		<cryptsl.version>1.0.0-SNAPSHOT</cryptsl.version>
