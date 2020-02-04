@@ -15,7 +15,7 @@
 		<soot.version>3.3.0</soot.version>
 		<cryptsl.version>1.0.0-SNAPSHOT</cryptsl.version>
 		<soot.version>3.3.0</soot.version>
- 	 	<spdsVersion>2.4-SNAPSHOT</spdsVersion>		
+ 	 	<spdsVersion>2.4</spdsVersion>		
 	</properties>
 
 	<build>
