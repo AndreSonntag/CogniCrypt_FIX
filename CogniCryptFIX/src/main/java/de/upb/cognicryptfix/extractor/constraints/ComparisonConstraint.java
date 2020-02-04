@@ -1,74 +1,45 @@
 package de.upb.cognicryptfix.extractor.constraints;
 
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import crypto.rules.CryptSLArithmeticConstraint.ArithOp;
-import crypto.rules.CryptSLComparisonConstraint.CompOp;
-import de.upb.cognicryptfix.utils.Pair;
+import crypto.rules.CrySLComparisonConstraint.CompOp;
 
+
+/**
+ * A ComparsionConstraint is, for instance, iterationCount >= 10000;
+ * 
+ * @author Andre Sonntag
+ * @date 22.09.2019
+ */
 public class ComparisonConstraint implements IConstraint{
 
 	private static final Logger logger = LogManager.getLogger(ComparisonConstraint.class.getSimpleName());
 	private CompOp operator;
-	private SubConstraint leftSubCon;	//used values
-	private SubConstraint rightSubCon;	//expected values
+	private ArithmeticConstraint leftAritCon;		//used values
+	private ArithmeticConstraint rightAritCon;	//expected values
 
-	public ComparisonConstraint() {
-	}
 	
-	public String getOperatorAsString() {
-		return resolveCompOperator(operator);
-	}
-	
-	public void setOperator(CompOp operator) {
+	public ComparisonConstraint(CompOp operator, ArithmeticConstraint leftAritCon, ArithmeticConstraint rightAritCon) {
+		super();
 		this.operator = operator;
-	}
-	
-	public SubConstraint getLeftSubCon() {
-		return leftSubCon;
-	}
-
-	public void createLeft(ArithOp operator, Pair<String> left, Pair<String> right) {
-		this.leftSubCon = new SubConstraint(operator, left, right);
-	}
-
-	public SubConstraint getRightSubCon() {
-		return rightSubCon;
-	}
-
-	public void createRight(ArithOp operator, Pair<String> left, Pair<String> right) {
-		this.rightSubCon = new SubConstraint(operator, left, right);
+		this.leftAritCon = leftAritCon;
+		this.rightAritCon = rightAritCon;
 	}
 
 	@Override
 	public String getUsedValue() throws ScriptException {
-		//TODO: check boolean expression
-		ScriptEngineManager mgr = new ScriptEngineManager();
-	    ScriptEngine engine = mgr.getEngineByName("JavaScript");
-	    String expressions  = getLeftSubCon().getLeftVarPair().getVal()+
-	    					  getLeftSubCon().getOperatorAsString()+
-	    					  getLeftSubCon().getRightVarPair().getVal();
-	    Object res = engine.eval(expressions);
-		return res.toString();
+		return leftAritCon.resolveConstraint();
 	}
 	
 	@Override
 	public String getExpectedConstraintValue() throws ScriptException {
-		ScriptEngineManager mgr = new ScriptEngineManager();
-	    ScriptEngine engine = mgr.getEngineByName("JavaScript");
-	    String expressions  = getRightSubCon().getLeftVarPair().getVal()+
-	    					  getRightSubCon().getOperatorAsString()+
-	    					  getRightSubCon().getRightVarPair().getVal();
-		Object res = engine.eval(expressions);
-		return res.toString();
+		return rightAritCon.resolveConstraint();
 	}
 	
-	private String resolveCompOperator(CompOp op) {
+	private String resolveComparsionOperator(CompOp op) {
 		switch (op) {
 		case l:
 			return "<";
@@ -87,51 +58,10 @@ public class ComparisonConstraint implements IConstraint{
 	
 	@Override
 	public String toString() {
-		return "SimpleConstraint [operator:" + resolveCompOperator(operator) + ", leftSubCon:" + leftSubCon.toString() + ", rightSubCon:" + rightSubCon.toString() + "]";
+		return "SimpleConstraint [operator:" + resolveComparsionOperator(operator) + ", leftSubCon:" + leftAritCon.toString() + ", rightSubCon:" + rightAritCon.toString() + "]";
 	}
 
-	private class SubConstraint {
-		
-		private ArithOp operator;
-		private Pair<String> leftVarPair;
-		private Pair<String> rightVarPair;
-		
-		public SubConstraint(ArithOp operator, Pair<String> leftVarPair, Pair<String> rightVarPair) {
-			this.operator = operator;
-			this.leftVarPair = leftVarPair;
-			this.rightVarPair = rightVarPair;
-		}
-		
-		public String getOperatorAsString() {
-			return resolveArithOperator(operator);
-		}
-		
-		public Pair<String> getLeftVarPair() {
-			return leftVarPair;
-		}
-
-		public Pair<String> getRightVarPair() {
-			return rightVarPair;
-		}
-		
-		private String resolveArithOperator(ArithOp op) {
-			switch (op) {
-			case p:
-				return "+";
-			case n:
-				return "-";
-			case m:				
-				return ">";
-			default:
-				return "something went wrong";
-			}
-		}
-
-		@Override
-		public String toString() {
-			return "SubConstraint [operator:" + resolveArithOperator(operator) + ", leftVarPair:" + leftVarPair.toString() + ", rightVarPair:" + rightVarPair.toString() + "]";
-		}
 	
-	}
+
 
 }
