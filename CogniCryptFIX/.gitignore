@@ -7,3 +7,4 @@
 bin/
 *.temp
 *.class
+*.crysl
