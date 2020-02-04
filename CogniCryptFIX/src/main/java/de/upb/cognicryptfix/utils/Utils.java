@@ -1,5 +1,6 @@
 package de.upb.cognicryptfix.utils;
 
+import java.util.Collection;
 import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
@@ -13,10 +14,10 @@ import crypto.extractparameter.CallSiteWithExtractedValue;
 import crypto.extractparameter.CallSiteWithParamIndex;
 import crypto.extractparameter.ExtractedValue;
 import crypto.interfaces.ISLConstraint;
-import crypto.rules.CryptSLComparisonConstraint;
-import crypto.rules.CryptSLConstraint;
-import crypto.rules.CryptSLPredicate;
-import crypto.rules.CryptSLValueConstraint;
+import crypto.rules.CrySLComparisonConstraint;
+import crypto.rules.CrySLConstraint;
+import crypto.rules.CrySLPredicate;
+import crypto.rules.CrySLValueConstraint;
 import soot.IntType;
 import soot.Value;
 import soot.jimple.AssignStmt;
@@ -43,25 +44,25 @@ public class Utils {
 	public static String constraintToString(ISLConstraint constraint) {
 		StringBuilder builder = new StringBuilder();
 		
-		if(constraint instanceof CryptSLConstraint) {
-			CryptSLConstraint con = (CryptSLConstraint) constraint;
+		if(constraint instanceof CrySLConstraint) {
+			CrySLConstraint con = (CrySLConstraint) constraint;
 			builder.append("\n"+con.getClass().getSimpleName()+"[\n");
 			builder.append("left = "+con.getLeft()+"\n");
 			builder.append("right = "+con.getRight()+"\n");
 			builder.append("op = "+con.getOperator()+"\n");
 
-		}else if (constraint instanceof CryptSLValueConstraint) {
-			CryptSLValueConstraint con = (CryptSLValueConstraint) constraint;
+		}else if (constraint instanceof CrySLValueConstraint) {
+			CrySLValueConstraint con = (CrySLValueConstraint) constraint;
 			builder.append("\n"+con.getClass().getSimpleName()+"[\n");
 			builder.append(con.toString()+"]\n");
 
-		}else if (constraint instanceof CryptSLPredicate) {
-			CryptSLPredicate con = (CryptSLPredicate) constraint;
+		}else if (constraint instanceof CrySLPredicate) {
+			CrySLPredicate con = (CrySLPredicate) constraint;
 			builder.append("\n"+con.getClass().getSimpleName()+"[\n");
 			builder.append(con.toString()+"]\n");
 
-		}else if (constraint instanceof CryptSLComparisonConstraint) {
-			CryptSLComparisonConstraint con = (CryptSLComparisonConstraint) constraint;
+		}else if (constraint instanceof CrySLComparisonConstraint) {
+			CrySLComparisonConstraint con = (CrySLComparisonConstraint) constraint;
 			builder.append("\n"+con.getClass().getSimpleName()+"[\n");
 			builder.append(con.toString()+"]\n");
 		}
@@ -107,4 +108,13 @@ public class Utils {
 		}
 	}
 
+	/**
+	 * This method checks if a Collection is null or empty
+	 * @param c
+	 * @return 
+	 */
+	public static boolean isNullOrEmpty( final Collection< ? > c ) {
+	    return c == null || c.isEmpty();
+	}
+	
 }

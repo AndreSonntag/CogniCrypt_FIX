@@ -1,42 +1,34 @@
 package de.upb.cognicryptfix.utils;
 
-public class Pair <T>{
+public class Pair <S, T>{
 	
-	private T var;
-	private T val;
-
-	public Pair() {
-		
-	}
-
-	public Pair(T var, T val) {
+	private S left;
+	private T right;
+	
+	public Pair(S left, T right) {
 		super();
-		this.var = var;
-		this.val = val;
+		this.left = left;
+		this.right = right;
 	}
 
-	public T getVar() {
-		return var;
+	public S getLeft() {
+		return left;
 	}
 
-	public void setVar(T var) {
-		this.var = var;
-	}
-
-	public T getVal() {
-		return val;
-	}
-
-	public void setVal(T val) {
-		this.val = val;
+	public T getRight() {
+		return right;
 	}
 
 	@Override
 	public String toString() {
-		return "Pair [var:" + var + ", val:" + val + "]";
+		return "Pair [left=" + left + ", right=" + right + "]";
 	}
+
+
 	
-	
+
+
+
 
 
 }
