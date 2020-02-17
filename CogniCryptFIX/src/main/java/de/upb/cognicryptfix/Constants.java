@@ -11,12 +11,8 @@ public class Constants {
 
 	public static final String outerFileSeparator = System.getProperty("file.separator");
 	public static final String lineSeparator = System.getProperty("line.separator");
-	
-	//CrySL related
 	public static final String crySLRulePath = Constants.class.getResource("/CrySLRules/").getPath();
+	public final static List<String> predefinedPreds = Arrays.asList("callTo", "noCallTo", "neverTypeOf", "length",
+			"notHardCoded");
 
-	
-    public final static List<String> predefinedPreds = Arrays.asList("callTo", "noCallTo", "neverTypeOf", "length", "notHardCoded");
-
-	
 }

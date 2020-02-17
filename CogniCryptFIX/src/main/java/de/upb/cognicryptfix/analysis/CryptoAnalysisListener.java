@@ -1,13 +1,16 @@
 package de.upb.cognicryptfix.analysis;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Table;
+import com.sun.org.apache.bcel.internal.generic.FMUL;
 
 import boomerang.BackwardQuery;
 import boomerang.Query;
@@ -19,6 +22,9 @@ import crypto.analysis.CrySLAnalysisListener;
 import crypto.analysis.EnsuredCrySLPredicate;
 import crypto.analysis.IAnalysisSeed;
 import crypto.analysis.errors.AbstractError;
+import crypto.analysis.errors.ConstraintError;
+import crypto.analysis.errors.ForbiddenMethodError;
+import crypto.analysis.errors.NeverTypeOfError;
 import crypto.extractparameter.CallSiteWithParamIndex;
 import crypto.extractparameter.ExtractedValue;
 import crypto.interfaces.ISLConstraint;
@@ -36,19 +42,48 @@ import typestate.TransitionFunction;
 public class CryptoAnalysisListener extends CrySLAnalysisListener{
 
 	private static final Logger logger = LogManager.getLogger(CryptoAnalysisListener.class.getSimpleName());
+	private List<AbstractError> errors;
+	private List<AbstractError> fMethodError;
+	private List<AbstractError> nTypeOfError;
+	private List<AbstractError> compValueError;
 	
 	public CryptoAnalysisListener() {
+		errors = Lists.newArrayList();
+		fMethodError = Lists.newArrayList();
+		nTypeOfError = Lists.newArrayList();
+		compValueError = Lists.newArrayList();
 	}
 	
+	
 	public void reportError(AbstractError error) {
-		IPatcher patcher = new JimplePatcher();
-		patcher.getPatchedClass(error);
+			
+		if(error instanceof ForbiddenMethodError) {
+			fMethodError.add(error);
+		}
+		else if(error instanceof NeverTypeOfError) {
+			nTypeOfError.add(error);
+		}
+		else if(error instanceof ConstraintError) {
+			compValueError.add(error);
+		}
+		
+		
+		
 	}
 	
 	
 	public void afterAnalysis() {
-		// TODO Auto-generated method stub
 		
+		errors.addAll(fMethodError);
+		errors.addAll(nTypeOfError);
+		errors.addAll(compValueError);
+		
+		IPatcher patcher = new JimplePatcher();
+
+		for(AbstractError e : errors) {
+			patcher.getPatchedClass(e);
+		}
+				
 	}
 
 	public void afterConstraintCheck(AnalysisSeedWithSpecification arg0) {

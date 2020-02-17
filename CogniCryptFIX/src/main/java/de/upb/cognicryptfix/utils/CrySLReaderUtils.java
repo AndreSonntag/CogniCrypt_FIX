@@ -13,7 +13,6 @@ import org.apache.logging.log4j.Logger;
 
 import crypto.cryslhandler.CrySLModelReader;
 import crypto.rules.CrySLRule;
-import crypto.rules.CrySLRuleReader;
 
 /**
  * @author Andre Sonntag

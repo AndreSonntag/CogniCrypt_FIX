@@ -41,6 +41,13 @@ public class HeadlessRepairer {
 		
 	}
 	
+//	public static void run() {
+//		CryptoAnalysis analysis = new CryptoAnalysis();
+//		CryptoAnalysisListener listener = new CryptoAnalysisListener();
+//		analysis.runSoot(analysingProject, listener);
+//	}
+	
+	
 	public static void infoLogLevel() {
 		setLoggerLevel(Level.INFO);	
 	}

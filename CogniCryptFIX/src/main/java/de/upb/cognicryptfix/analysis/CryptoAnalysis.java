@@ -63,6 +63,7 @@ public class CryptoAnalysis {
 		};
 	}
 	
+	
 	public static boolean runSoot(final MavenProject project, final CrySLAnalysisListener listener) {
 		G.reset();
 		setSootOptions(project);
@@ -84,6 +85,7 @@ public class CryptoAnalysis {
 	}
 
 	private static void setSootOptions(final MavenProject project) {
+//		Options.v().set_src_prec(3);
 		Options.v().set_soot_classpath(getSootClasspath(project));
 		Options.v().set_process_dir(Lists.newArrayList(project.getBuildDirectory()));
 		Options.v().set_keep_line_number(true);
@@ -109,7 +111,6 @@ public class CryptoAnalysis {
 		Options.v().setPhaseOption("jb", "use-original-names:true");
 		Options.v().set_output_format(Options.output_format_none);
 		logger.info("initializing soot");
-
 	}
 
 	private static List<String> getIncludeList() {
