@@ -122,6 +122,7 @@ public class NeverTypeOfPatch extends AbstractPatch {
 		Body body = error.getErrorLocation().getMethod().getActiveBody();				
 		//TODO: needs a more generic solution: maybe single and array data types, also consider casts please
 		//Analysis does not detect casts
+		//TODO: byte[] case
 		try {
 			switch (predCon.getUsedValue()) {
 			case "java.lang.String":
