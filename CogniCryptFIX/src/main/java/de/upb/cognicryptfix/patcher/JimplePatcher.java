@@ -29,6 +29,7 @@ import de.upb.cognicryptfix.extractor.constraints.ValueConstraint;
 import de.upb.cognicryptfix.patcher.patches.ForbiddenMethodPatch;
 import de.upb.cognicryptfix.patcher.patches.NeverTypeOfPatch;
 import de.upb.cognicryptfix.patcher.patches.PrimitiveConstraintPatch;
+import de.upb.cognicryptfix.utils.Utils;
 import soot.Body;
 import soot.SootClass;
 
@@ -44,7 +45,16 @@ public class JimplePatcher implements IPatcher{
 	public SootClass getPatchedClass(AbstractError error) {
 		SootClass errorClass = error.getErrorLocation().getMethod().getDeclaringClass();
 		Body patchedBody = createPatch(error);
-//		error.getErrorLocation().getMethod().setActiveBody(patchedBody);		
+		int errorCounter = verifyPatch2(error);
+		
+		if(errorCounter > 0) {
+			patchedBody = createPatch(error);
+			errorCounter = verifyPatch2(error);
+		}
+		
+		
+	//	error.getErrorLocation().getMethod().setActiveBody(patchedBody);
+
 		return errorClass;
 	}
 	
@@ -52,9 +62,10 @@ public class JimplePatcher implements IPatcher{
 		Body patchedJimpleBody = error.getErrorLocation().getMethod().getActiveBody();
 		
 		if (error instanceof ForbiddenMethodError) {
-			ForbiddenMethodError fMethodError = (ForbiddenMethodError) error;
+			ForbiddenMethodError fMethodError = (ForbiddenMethodError) error;			
 			ForbiddenMethodPatch patch = new ForbiddenMethodPatch(fMethodError);
 			patch.getPatch();
+			logger.info("Create patch for "+fMethodError.getClass().getSimpleName());
 			logger.info(patch.toString());
 		}
 		else if (error instanceof NeverTypeOfError) {
@@ -66,9 +77,8 @@ public class JimplePatcher implements IPatcher{
 			
 			NeverTypeOfPatch patch = new NeverTypeOfPatch(nTypeError, predCon);
 			patchedJimpleBody = patch.getPatch();
+			logger.info("Create patch for "+nTypeError.getClass().getSimpleName());
 			logger.info(patch.toString());
-			error.getErrorLocation().getMethod().setActiveBody(patchedJimpleBody);
-			verifyPatch((ConstraintError) error);	
 		}
 		else if (error instanceof ConstraintError) {
 			ConstraintError conError = (ConstraintError) error;
@@ -85,7 +95,6 @@ public class JimplePatcher implements IPatcher{
 					patchedJimpleBody = patch.getPatch();
 					error.getErrorLocation().getMethod().setActiveBody(patchedJimpleBody);
 					logger.info(patch.toString());
-					verifyPatch(conError);
 				}
 				if(brokenCon instanceof CrySLValueConstraint) {
 					logger.info("Create patch for "+conError.getClass().getSimpleName() +"_"+brokenCon.getClass().getSimpleName()+" :" + conError.toErrorMarkerString());
@@ -96,34 +105,27 @@ public class JimplePatcher implements IPatcher{
 					patchedJimpleBody = patch.getPatch();
 					error.getErrorLocation().getMethod().setActiveBody(patchedJimpleBody);
 					logger.info(patch.toString());
-					verifyPatch(conError);
-				}
-				if(brokenCon instanceof CrySLPredicate) {
-					
-					if(!(conError instanceof NeverTypeOfError)) {
-						logger.info("Create patch for "+conError.getClass().getSimpleName() +"_"+brokenCon.getClass().getSimpleName()+" :" + conError.toErrorMarkerString());
-						
-						CrySLPredicateExtractor extractor = new CrySLPredicateExtractor(seed, (CrySLPredicate) brokenCon);
-						extractor.extract();
-					}
-					
-				}
-				
+				}				
 		}
+
 		return patchedJimpleBody;
 	}
-	
-	
 	
 	/*
 	 * Notes: Maybe just useful vor value constraints ??
 	 */
-	private boolean verifyPatch(ConstraintError error){
+	private int verifyPatch2(AbstractError error){
 		logger.info("Verify patch for "+error.getClass().getSimpleName()+" : " +error.toErrorMarkerString());
 
-		AnalysisSeedWithSpecification seed = (AnalysisSeedWithSpecification)error.getObjectLocation();
+		AnalysisSeedWithSpecification seed = null;
+		if(error instanceof ConstraintError) {
+			ConstraintError conError = (ConstraintError) error;
+			seed = (AnalysisSeedWithSpecification)conError.getObjectLocation();
+		}else {
+			seed = Utils.createSeed(error.getRule(), error.getErrorLocation().getMethod());
+
+		}
 		seed.execute();
-		//seed.getParameterAnalysis().getCollectedValues()
 		Collection<Statement> collectedCalls = new HashSet<Statement>();
 		collectedCalls.add(error.getErrorLocation());		
 
@@ -133,15 +135,39 @@ public class JimplePatcher implements IPatcher{
 		ConstraintSolver solver = new ConstraintSolver(seed, collectedCalls, resultsAggregator);
 
 		resultsAggregator.checkedConstraints(seed, solver.getRelConstraints());
-	
-		/*
-		 * TODO: try to understand!
-		 */
-		boolean internalConstraintSatisfied = false;
-		internalConstraintSatisfied = (0 == solver.evaluateRelConstraints());
-
-	
-		return internalConstraintSatisfied;
+		
+		
+		int errors = solver.evaluateRelConstraints();
+		return errors;
 	}
+	
+//	/*
+//	 * Notes: Maybe just useful vor value constraints ??
+//	 */
+//	private boolean verifyPatch(ConstraintError error){
+//		logger.info("Verify patch for "+error.getClass().getSimpleName()+" : " +error.toErrorMarkerString());
+//
+//		AnalysisSeedWithSpecification seed = (AnalysisSeedWithSpecification) error.getObjectLocation();
+//		seed.execute();
+//		//seed.getParameterAnalysis().getCollectedValues()
+//		Collection<Statement> collectedCalls = new HashSet<Statement>();
+//		collectedCalls.add(error.getErrorLocation());		
+//
+//		CrySLResultsReporter resultsAggregator = new CrySLResultsReporter();
+//		resultsAggregator.addReportListener(new CryptoAnalysisListener());
+//		
+//		ConstraintSolver solver = new ConstraintSolver(seed, collectedCalls, resultsAggregator);
+//
+//		resultsAggregator.checkedConstraints(seed, solver.getRelConstraints());
+//	
+//		/*
+//		 * TODO: try to understand!
+//		 */
+//		boolean internalConstraintSatisfied = false;
+//		internalConstraintSatisfied = (0 == solver.evaluateRelConstraints());
+//
+//	
+//		return internalConstraintSatisfied;
+//	}
 	
 }
