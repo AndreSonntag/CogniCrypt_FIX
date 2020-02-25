@@ -2,9 +2,13 @@ package de.upb.cognicryptfix.utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Set;
+
+import javax.swing.text.StyleConstants.CharacterConstants;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -48,9 +52,10 @@ import soot.jimple.StaticInvokeExpr;
 import soot.jimple.StringConstant;
 import soot.toolkits.graph.ExceptionalUnitGraph;
 import soot.util.Chain;
-
+@Deprecated
 public class JimpleCodeGenerator {
 
+//	Aggregator.v().transform(body);
 	private static FastHierarchy hierarchy = Scene.v().getOrMakeFastHierarchy();
 
 	/**
@@ -227,6 +232,8 @@ public class JimpleCodeGenerator {
 		return assignStmt;
 	}
 
+	
+	
 	/**
 	 * <p>
 	 * Generates a {@link AssignStmt} as {@link Unit} object between a {@link Local}
@@ -269,7 +276,9 @@ public class JimpleCodeGenerator {
 			return LongConstant.v(((Long) object).longValue());
 		} else if (object instanceof Short) {
 			return LongConstant.v(((Short) object).shortValue());
-		} else if (object instanceof String) {
+		} else if (object instanceof Character) {
+			return StringConstant.v(object+"");
+		} else if (object instanceof String) {			
 			return StringConstant.v((String) object);
 		} else if (object instanceof Double) {
 			return DoubleConstant.v(((Double) object).doubleValue());
@@ -353,11 +362,12 @@ public class JimpleCodeGenerator {
 
 			// look for the beste method to inialize the object
 			if (clazz.isAbstract()) {
-
+				
 			} else if (clazz.isInterface()) {
-
+				clazz = getImplementedInterface(clazz);
+				initMethod = getBestInitializationMethod(clazz);		
 			} else {
-				initMethod = Utils.getBestInitializationMethod(clazz);
+				initMethod = getBestInitializationMethod(clazz);
 			}
 
 			List<Type> parameterTypes = initMethod.getParameterTypes();
@@ -490,79 +500,68 @@ public class JimpleCodeGenerator {
 			body.getUnits().insertBeforeNoRedirect(stmt, s);
 	}
 
+	private static SootMethod getBestInitializationMethod(SootClass clazz) {
+		List<SootMethod> initMethods = Lists.newArrayList();
+		for (SootMethod method : clazz.getMethods()) {
+			if (method.isConstructor() || method.getName().contains("getInstance")) {
+				initMethods.add(method);
+			}
+		}
+		Collections.sort(initMethods, new InitializationMethodSorter());
+		return initMethods.get(0);		//TODO modify back!!!!
+	}
 	
-	
-
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	private SootClass getImplementedInterface(SootClass clazz) {
-
-		return null;
+	private static SootClass getImplementedInterface(SootClass clazz) {
+		HashMap<SootMethod,SootClass> implementationMap = Maps.newHashMap();
+		
+		List<SootClass> implementations = new ArrayList(hierarchy.getAllImplementersOfInterface(clazz));
+		for(SootClass implementation : implementations) {
+			implementationMap.put(getBestInitializationMethod(implementation),implementation);
+		}
+		
+		List<SootMethod> initMethods = Lists.newArrayList(implementationMap.keySet());
+		Collections.sort(initMethods, new InitializationMethodSorter());
+		
+		return implementationMap.get(initMethods);
 	}
 
 	private SootClass getSubclass(SootClass clazz) {
 		return null;
 	}
-
 	
-	
-	
-	
-	// TODO:
-	public static HashMap<Value, List<Unit>> generateParameterArray(Body body, List<Value> parameterList) {
-		List<Unit> generated = new ArrayList<Unit>();
-		NewArrayExpr arrayExpr = Jimple.v().newNewArrayExpr(CharType.v(), IntConstant.v(parameterList.size()));
-
-		Value newArrayLocal = JimpleCodeGenerator.generateFreshLocal(body,
-				JimpleCodeGenerator.getParameterArrayType(CharType.v(), 1));
-		Unit newAssignStmt = Jimple.v().newAssignStmt(newArrayLocal, arrayExpr);
-		generated.add(newAssignStmt);
-
-		for (int i = 0; i < parameterList.size(); i++) {
+	public static HashMap<Local, List<Unit>> generateArrayUnits(Body body, Type contentType, List<Value> contentValues) {
+		
+		HashMap<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
+		Local arrayLocal = genereateFreshArrayLocal(body, contentType, contentValues.size());
+		AssignStmt arrayAssign = (AssignStmt) generateArrayAssignStmt(arrayLocal, arrayLocal.getType(), contentValues.size());
+		generatedUnits.put(arrayLocal, Lists.newArrayList());
+		generatedUnits.get(arrayLocal).add(arrayAssign);
+		 
+		for (int i = 0; i < contentValues.size(); i++) {
 			Value index = IntConstant.v(i);
-			ArrayRef leftSide = Jimple.v().newArrayRef(newArrayLocal, index);
-			Value rightSide = JimpleCodeGenerator.generateCorrectObject(body, parameterList.get(i), generated);
-
+			ArrayRef leftSide = Jimple.v().newArrayRef(arrayLocal, index);
+			Value rightSide = JimpleCodeGenerator.generateArrayUnit(body, contentValues.get(i), generatedUnits.get(arrayLocal));
 			Unit parameterInArray = Jimple.v().newAssignStmt(leftSide, rightSide);
-			generated.add(parameterInArray);
+			generatedUnits.get(arrayLocal).add(generateAssignStmt(leftSide, rightSide));
 		}
-
-		HashMap<Value, List<Unit>> units = new HashMap<Value, List<Unit>>();
-		units.put(newArrayLocal, generated);
-		return units;
+		return generatedUnits;
 	}
 
-	// TODO:
-	public static Value generateCorrectObject(Body body, Value value, List<Unit> generated) {
+
+	public static Value generateArrayUnit(Body body, Value value, List<Unit> generated) {
 		if (value.getType() instanceof PrimType) {
-			// in case of a primitive type, we use boxing (I know it is not nice, but it
-			// works...) in order to use the Object type
+
 			if (value.getType() instanceof BooleanType) {
 				Local booleanLocal = generateFreshLocal(body, RefType.v("java.lang.Boolean"));
-
 				SootClass sootClass = Scene.v().getSootClass("java.lang.Boolean");
 				SootMethod valueOfMethod = sootClass.getMethod("java.lang.Boolean valueOf(boolean)");
 				StaticInvokeExpr staticInvokeExpr = Jimple.v().newStaticInvokeExpr(valueOfMethod.makeRef(), value);
 
 				Unit newAssignStmt = Jimple.v().newAssignStmt(booleanLocal, staticInvokeExpr);
 				generated.add(newAssignStmt);
-
 				return booleanLocal;
 			} else if (value.getType() instanceof ByteType) {
 				Local byteLocal = generateFreshLocal(body, RefType.v("java.lang.Byte"));
-
 				SootClass sootClass = Scene.v().getSootClass("java.lang.Byte");
 				SootMethod valueOfMethod = sootClass.getMethod("java.lang.Byte valueOf(byte)");
 				StaticInvokeExpr staticInvokeExpr = Jimple.v().newStaticInvokeExpr(valueOfMethod.makeRef(), value);
@@ -573,7 +572,6 @@ public class JimpleCodeGenerator {
 				return byteLocal;
 			} else if (value.getType() instanceof CharType) {
 				Local characterLocal = generateFreshLocal(body, RefType.v("java.lang.Character"));
-
 				SootClass sootClass = Scene.v().getSootClass("java.lang.Character");
 				SootMethod valueOfMethod = sootClass.getMethod("java.lang.Character valueOf(char)");
 				StaticInvokeExpr staticInvokeExpr = Jimple.v().newStaticInvokeExpr(valueOfMethod.makeRef(), value);
@@ -584,10 +582,8 @@ public class JimpleCodeGenerator {
 				return characterLocal;
 			} else if (value.getType() instanceof DoubleType) {
 				Local doubleLocal = generateFreshLocal(body, RefType.v("java.lang.Double"));
-
 				SootClass sootClass = Scene.v().getSootClass("java.lang.Double");
 				SootMethod valueOfMethod = sootClass.getMethod("java.lang.Double valueOf(double)");
-
 				StaticInvokeExpr staticInvokeExpr = Jimple.v().newStaticInvokeExpr(valueOfMethod.makeRef(), value);
 
 				Unit newAssignStmt = Jimple.v().newAssignStmt(doubleLocal, staticInvokeExpr);
@@ -596,7 +592,6 @@ public class JimpleCodeGenerator {
 				return doubleLocal;
 			} else if (value.getType() instanceof FloatType) {
 				Local floatLocal = generateFreshLocal(body, RefType.v("java.lang.Float"));
-
 				SootClass sootClass = Scene.v().getSootClass("java.lang.Float");
 				SootMethod valueOfMethod = sootClass.getMethod("java.lang.Float valueOf(float)");
 				StaticInvokeExpr staticInvokeExpr = Jimple.v().newStaticInvokeExpr(valueOfMethod.makeRef(), value);
@@ -607,7 +602,6 @@ public class JimpleCodeGenerator {
 				return floatLocal;
 			} else if (value.getType() instanceof IntType) {
 				Local integerLocal = generateFreshLocal(body, RefType.v("java.lang.Integer"));
-
 				SootClass sootClass = Scene.v().getSootClass("java.lang.Integer");
 				SootMethod valueOfMethod = sootClass.getMethod("java.lang.Integer valueOf(int)");
 				StaticInvokeExpr staticInvokeExpr = Jimple.v().newStaticInvokeExpr(valueOfMethod.makeRef(), value);
@@ -618,7 +612,6 @@ public class JimpleCodeGenerator {
 				return integerLocal;
 			} else if (value.getType() instanceof LongType) {
 				Local longLocal = generateFreshLocal(body, RefType.v("java.lang.Long"));
-
 				SootClass sootClass = Scene.v().getSootClass("java.lang.Long");
 				SootMethod valueOfMethod = sootClass.getMethod("java.lang.Long valueOf(long)");
 				StaticInvokeExpr staticInvokeExpr = Jimple.v().newStaticInvokeExpr(valueOfMethod.makeRef(), value);
@@ -629,7 +622,6 @@ public class JimpleCodeGenerator {
 				return longLocal;
 			} else if (value.getType() instanceof ShortType) {
 				Local shortLocal = generateFreshLocal(body, RefType.v("java.lang.Short"));
-
 				SootClass sootClass = Scene.v().getSootClass("java.lang.Short");
 				SootMethod valueOfMethod = sootClass.getMethod("java.lang.Short valueOf(short)");
 				StaticInvokeExpr staticInvokeExpr = Jimple.v().newStaticInvokeExpr(valueOfMethod.makeRef(), value);
@@ -641,7 +633,6 @@ public class JimpleCodeGenerator {
 			} else
 				throw new RuntimeException("Ooops, something went all wonky!");
 		} else
-			// just return the value, there is nothing to box
 			return value;
 	}
 

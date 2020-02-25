@@ -2,12 +2,14 @@ package de.upb.cognicryptfix.utils;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
@@ -44,22 +46,42 @@ public class Utils {
 
 	private static final Logger logger = LogManager.getLogger(Utils.class);
 
-	public static AnalysisSeedWithSpecification createSeed(CrySLRule rule ,SootMethod method) {
+	private static HashMap<String,Class> wrapperMap;
+	static{
+		wrapperMap = new HashMap<String,Class>();
+		wrapperMap.put("int", Integer.class );
+		wrapperMap.put("long", Long.class );
+		wrapperMap.put("double", Double.class );
+		wrapperMap.put("float", Float.class );
+		wrapperMap.put("bool", Boolean.class );
+		wrapperMap.put("char", Character.class );
+		wrapperMap.put("byte", Byte.class );
+		wrapperMap.put("void", Void.class );
+		wrapperMap.put("short", Short.class );
+	}
+	
+	public static <T> Class<T> getWrapperClassByPrimeTypeName(String name) {
+		return wrapperMap.get(name);
+	}
+	
+	
+	public static AnalysisSeedWithSpecification createSeed(CrySLRule rule, SootMethod method) {
 
 		AnalysisSeedWithSpecification ret = null;
-		
+
 		if (method == null || !method.hasActiveBody() || !method.getDeclaringClass().isApplicationClass()) {
-    		throw new RuntimeException("upppsss");
+			throw new RuntimeException("upppsss");
 		}
-		
+
 		ClassSpecification spec = new ClassSpecification(rule, CryptoAnalysis.staticScanner);
 		spec.invokesForbiddenMethod(method);
-		
+
 		if (spec.getRule().getClassName().equals("javax.crypto.SecretKey")) {
-    		throw new RuntimeException("upppsss");
+			throw new RuntimeException("upppsss");
 		}
 		for (Query seed : spec.getInitialSeeds(method)) {
-			ret = CryptoAnalysis.staticScanner.getOrCreateSeedWithSpec(new AnalysisSeedWithSpecification(CryptoAnalysis.staticScanner, seed.stmt(), seed.var(), spec));
+			ret = CryptoAnalysis.staticScanner.getOrCreateSeedWithSpec(
+					new AnalysisSeedWithSpecification(CryptoAnalysis.staticScanner, seed.stmt(), seed.var(), spec));
 		}
 		return ret;
 	}
@@ -150,22 +172,8 @@ public class Utils {
 	public static boolean isNullOrEmpty(final Collection<?> c) {
 		return c == null || c.isEmpty();
 	}
+
 	
-	/**
-	 * 
-	 * @param clazz
-	 * @return
-	 */
-	public static SootMethod getBestInitializationMethod(SootClass clazz) {
-		List<SootMethod> initMethods = Lists.newArrayList();
-		for (SootMethod method : clazz.getMethods()) {
-			if (method.isConstructor() || method.getName().contains("getInstance")) {
-				initMethods.add(method);
-			}
-		}
-		
-		Collections.sort(initMethods, new InitializationMethodSorter());
-		return initMethods.get(0);		//TODO modify back!!!!
-	}
+	
 
 }
