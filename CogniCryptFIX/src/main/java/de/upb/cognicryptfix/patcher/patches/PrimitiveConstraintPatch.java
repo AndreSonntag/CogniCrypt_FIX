@@ -76,8 +76,11 @@ public class PrimitiveConstraintPatch extends AbstractPatch {
 		Unit errorCall = error.getErrorLocation().getUnit().get();
 		Statement statement = error.getCallSiteWithExtractedValue().getCallSite().stmt();		
 		Value parameter = error.getErrorLocation().getUnit().get().getInvokeExpr().getArg(brokenVarIndex);
-		ExtractedValue ev = BoomerangUtils.bommerangPointsToAnalysis(icfg, (Local) parameter, statement, errorCall);
+		ExtractedValue ev = BoomerangUtils.bommerangPointsToAnalysis(icfg, (Local) parameter, statement, errorCall).get(0);
 		JAssignStmt var = (JAssignStmt) ev.stmt().getUnit().get();
+		
+		
+		// TODO: re-engineer the return types of the Values
 		if(StringUtils.isNumeric(patchValue)) {		
 			var.rightBox.setValue(IntConstant.v(Integer.parseInt(patchValue)));
 		}

@@ -20,7 +20,8 @@ import wpds.impl.Weight.NoWeight;
 
 public class BoomerangUtils {
 
-	public static ExtractedValue bommerangPointsToAnalysis(ObservableICFG<Unit, SootMethod> observableDynamicICFG, Local local, Statement statment, Unit unit) {
+	
+	public static ArrayList<ExtractedValue> bommerangPointsToAnalysis(ObservableICFG<Unit, SootMethod> observableDynamicICFG, Local local, Statement statment, Unit unit) {
 		Boomerang solver = new Boomerang(new CogniCryptIntAndStringBoomerangOptions() {
 			@Override
 			public boolean onTheFlyCallGraph() {
@@ -51,7 +52,7 @@ public class BoomerangUtils {
 			evList.add(ev);
 			} 
 		}
-		return ev;
+		return evList;
 	}	
 	
 }
