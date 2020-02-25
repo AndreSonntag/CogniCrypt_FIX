@@ -45,12 +45,11 @@ public class JimplePatcher implements IPatcher{
 	public SootClass getPatchedClass(AbstractError error) {
 		SootClass errorClass = error.getErrorLocation().getMethod().getDeclaringClass();
 		Body patchedBody = createPatch(error);
-		int errorCounter = verifyPatch2(error);
-		
-		if(errorCounter > 0) {
-			patchedBody = createPatch(error);
-			errorCounter = verifyPatch2(error);
-		}
+//		int errorCounter = verifyPatch2(error);
+//		if(errorCounter > 0) {
+//			patchedBody = createPatch(error);
+//			errorCounter = verifyPatch2(error);
+//		}
 		
 		
 	//	error.getErrorLocation().getMethod().setActiveBody(patchedBody);
@@ -70,6 +69,8 @@ public class JimplePatcher implements IPatcher{
 		}
 		else if (error instanceof NeverTypeOfError) {
 			NeverTypeOfError nTypeError = (NeverTypeOfError) error;
+			logger.info("Create patch for "+nTypeError.getClass().getSimpleName());
+
 			AnalysisSeedWithSpecification seed = (AnalysisSeedWithSpecification) nTypeError.getObjectLocation();
 
 			CrySLPredicateExtractor extractor = new CrySLPredicateExtractor(seed, (CrySLPredicate) nTypeError.getBrokenConstraint());
@@ -77,7 +78,6 @@ public class JimplePatcher implements IPatcher{
 			
 			NeverTypeOfPatch patch = new NeverTypeOfPatch(nTypeError, predCon);
 			patchedJimpleBody = patch.getPatch();
-			logger.info("Create patch for "+nTypeError.getClass().getSimpleName());
 			logger.info(patch.toString());
 		}
 		else if (error instanceof ConstraintError) {
