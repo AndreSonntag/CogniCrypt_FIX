@@ -21,7 +21,6 @@ public class ComparisonConstraint implements IConstraint{
 	private ArithmeticConstraint leftAritCon;		//used values
 	private ArithmeticConstraint rightAritCon;	//expected values
 
-	
 	public ComparisonConstraint(CompOp operator, ArithmeticConstraint leftAritCon, ArithmeticConstraint rightAritCon) {
 		super();
 		this.operator = operator;

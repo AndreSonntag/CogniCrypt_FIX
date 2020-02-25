@@ -17,7 +17,7 @@ import crypto.analysis.errors.ForbiddenMethodError;
 import crypto.rules.CrySLForbiddenMethod;
 import crypto.rules.CrySLMethod;
 import crypto.rules.CrySLRule;
-import de.upb.cognicryptfix.utils.JimpleCodeGenerator;
+import de.upb.cognicryptfix.generator.JimpleCodeGenerator;
 import de.upb.cognicryptfix.utils.Utils;
 import soot.Body;
 import soot.Local;
@@ -31,62 +31,65 @@ import soot.jimple.InvokeExpr;
 import soot.jimple.InvokeStmt;
 import soot.jimple.internal.JimpleLocalBox;
 
+/*
+ * Testing classes: Cipher, KeyGenerator, PBEKeySpec 
+ * Problems: CrySL forbidden block 
+ * TODO: generate return variable of alternative method call
+ */
+
 public class ForbiddenMethodPatch extends AbstractPatch {
 	private static final Logger logger = LogManager.getLogger(ForbiddenMethodPatch.class.getSimpleName());
 	private ForbiddenMethodError error;
 	private CrySLRule violatedCrySLRule;
 	private String brokenJimpleCode;
 	private String patchValue;
-
-//	Aggregator.v().transform(body);
-
+	private JimpleCodeGenerator codeGenerator;
+	
+	
 	public ForbiddenMethodPatch(ForbiddenMethodError error) {
 		this.error = error;
+		this.codeGenerator = JimpleCodeGenerator.getInstance(error.getErrorLocation().getMethod().getActiveBody());
 		setErrorInformation();
 	}
 
 	@Override
 	public Body getPatch() {
-		Body methodBody = error.getErrorLocation().getMethod().getActiveBody();
-		Unit forbiddenStmt = error.getErrorLocation().getUnit().get();
-		SootMethod forbiddenMethod = error.getCalledMethod();
-		ArrayList<SootMethod> alternatives = new ArrayList<>(error.getAlternatives());
 
-		if (Utils.isNullOrEmpty(alternatives)) {
-			methodBody.getUnits().remove(forbiddenStmt);
+		Body methodBody = error.getErrorLocation().getMethod().getActiveBody();
+		Unit forbiddenUnit = error.getErrorLocation().getUnit().get();
+		SootMethod forbiddenMethod = error.getCalledMethod();
+		ArrayList<SootMethod> alternativeMethods = new ArrayList<>(error.getAlternatives());
+
+		if (Utils.isNullOrEmpty(alternativeMethods)) {
+			methodBody.getUnits().remove(forbiddenUnit);
 		} else {
-			replaceForbiddenMethod(methodBody, forbiddenMethod, forbiddenStmt, alternatives);
+			replaceForbiddenMethod(methodBody, forbiddenMethod, forbiddenUnit, alternativeMethods.get(0));
 		}
 		return methodBody;
 	}
 
 	private void replaceForbiddenMethod(Body body, SootMethod forbiddenMethod, Unit forbiddenUnit,
-			ArrayList<SootMethod> alternatives) {
+			SootMethod alternativeMethod) {
 
-		SootMethod alternativeMethod = alternatives.get(0);
-
-		HashMap<Local, List<Unit>> generatedParameterUnits = generateParameterUnits(body, forbiddenMethod,
-				forbiddenUnit, alternativeMethod);
-		Value[] parameterLocals = generatedParameterUnits.keySet().toArray(new Value[0]);
+		HashMap<Local, List<Unit>> generatedParameterUnits = generateParameterUnits(body, forbiddenMethod, forbiddenUnit, alternativeMethod);
 		
-		
-		generateAlternativeInvokeExpr(body, forbiddenMethod, forbiddenUnit, alternativeMethod, parameterLocals);
+		Local[] parameterLocals = generatedParameterUnits.keySet().toArray(new Local[0]);
+		generateAndInsertAlternativeInvokeExpr(body, forbiddenMethod, forbiddenUnit, alternativeMethod, parameterLocals);
 //		alternatives.get(0).addException(Scene.v().getSootClass("java.io.IOException"));	//Test purpose
 		generateTraps(body, Arrays.asList(forbiddenUnit));
-		
-		for(List<Unit> unitList : generatedParameterUnits.values()) {
+
+		for (List<Unit> unitList : generatedParameterUnits.values()) {
 			generateTraps(body, unitList);
 		}
-		System.out.println();
 	}
 
-	private void generateAlternativeInvokeExpr(Body body, SootMethod forbiddenMethod, Unit forbiddenUnit,
-			SootMethod alternativeMethod, Value[] alternativeParameterLocals) {
+	private void generateAndInsertAlternativeInvokeExpr(Body body, SootMethod forbiddenMethod, Unit forbiddenUnit,
+			SootMethod alternativeMethod, Local[] alternativeParameterLocals) {
 
 		boolean isAssignStmt = false;
 		InvokeExpr forbiddenInvokeExpr = null;
 
-		// extract InvokeExpr
+		// extract forbidden InvokeExpr
 		if (forbiddenUnit instanceof AssignStmt) { // i.e. "cipherText = c.doFinal();"
 			isAssignStmt = true;
 			AssignStmt assign = (AssignStmt) forbiddenUnit;
@@ -101,39 +104,67 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 		Local invokeVarLocal = (Local) forbiddenInvokeExpr.getUseBoxes().stream()
 				.filter(useBox -> useBox instanceof JimpleLocalBox).map(ValueBox::getValue).findAny().orElse(null);
 
-		// generate the alternative InvokeStmt
-		Unit alternativeInvokeUnit = JimpleCodeGenerator.generateInvokeStmt(invokeVarLocal, alternativeMethod,
-				alternativeParameterLocals);
-		InvokeExpr alternativeInvokeExpr = ((InvokeStmt) alternativeInvokeUnit).getInvokeExpr();
+		// generate the alternative InvokeExpr for alternative Method
+		HashMap<Local, List<Unit>> generatedUnits = codeGenerator.generateCall(invokeVarLocal, alternativeMethod, alternativeParameterLocals);
 
-		if (isAssignStmt) {
-			AssignStmt assign = (AssignStmt) forbiddenUnit;
-			assign.getRightOpBox().setValue((Value) alternativeInvokeExpr);
-
-		} else {
-			InvokeStmt invoke = (InvokeStmt) forbiddenUnit;
-			invoke.setInvokeExpr(alternativeInvokeExpr);
+		Unit alternativeInvokeUnit = null;
+		InvokeExpr alternativeInvokeExpr = null;
+		for(List<Unit> l : generatedUnits.values()) {
+			alternativeInvokeUnit = l.get(0);
 		}
 		
+		if(alternativeMethod.isConstructor()) {
+			if(forbiddenMethod.isConstructor()) {
+				alternativeInvokeExpr = ((InvokeStmt) alternativeInvokeUnit).getInvokeExpr();
+
+				// replace forbidden InvokeExpr by alternative InvokeExpr
+				if (isAssignStmt) {
+					AssignStmt assign = (AssignStmt) forbiddenUnit;
+					assign.getRightOpBox().setValue((Value) alternativeInvokeExpr);
+				} else {
+					InvokeStmt invoke = (InvokeStmt) forbiddenUnit;
+					invoke.setInvokeExpr(alternativeInvokeExpr);
+				}
+			}
+			else {
+				body.getUnits().insertBefore(generatedUnits.get(0), forbiddenUnit);
+				body.getUnits().remove(forbiddenUnit);
+			}
+		}
+		else {
+			alternativeInvokeExpr = ((InvokeStmt) alternativeInvokeUnit).getInvokeExpr();
+			
+			// replace forbidden InvokeExpr by alternative InvokeExpr
+			if (isAssignStmt) {
+				AssignStmt assign = (AssignStmt) forbiddenUnit;
+				assign.getRightOpBox().setValue((Value) alternativeInvokeExpr);
+
+			} else {
+				InvokeStmt invoke = (InvokeStmt) forbiddenUnit;
+				invoke.setInvokeExpr(alternativeInvokeExpr);
+			}
+		}
 		patchValue = alternativeInvokeExpr.toString();
 	}
 
-	private HashMap<Local, List<Unit>> generateParameterUnits(Body body, SootMethod forbiddenMethod, Unit forbiddenUnit,
-			SootMethod alternativeMethod) {
+	private HashMap<Local, List<Unit>> generateParameterUnits(Body body, SootMethod forbiddenMethod, Unit forbiddenUnit, SootMethod alternativeMethod) {
 		HashMap<Local, List<Unit>> generatedUnits = Maps.newHashMap();
-		List<Entry<String, String>> parameterNames = extractParameterVarNameFromRule(forbiddenMethod,
-				alternativeMethod);
+		
+		// extract and use CrySL rule variable names for new generated parameters 
+		List<Entry<String, String>> parameterNames = extractParameterVarNameFromRule(forbiddenMethod, alternativeMethod);
 		List<String> parameterNameList = Lists.newArrayList();
 		for (Entry<String, String> names : parameterNames) {
 			parameterNameList.add(names.getKey());
 		}
-		generatedUnits = JimpleCodeGenerator.generateParameterUnits(body, alternativeMethod, parameterNameList, null);
+		
+		// generate parameter units
+		generatedUnits = codeGenerator.generateParametersForCall(alternativeMethod, parameterNameList, null);
 
 		List<Unit> parameterUnits = Lists.newArrayList();
 		for (List<Unit> l : generatedUnits.values()) {
 			parameterUnits.addAll(l);
 		}
-		
+
 		body.getUnits().insertBefore(parameterUnits, forbiddenUnit);
 		return generatedUnits;
 	}
@@ -141,31 +172,31 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 	private void generateTraps(Body body, List<Unit> units) {
 
 		for (Unit u : units) {
-
 			if (u instanceof AssignStmt) {
 				AssignStmt assign = (AssignStmt) u;
 				Value rightBox = assign.getRightOpBox().getValue();
 				if (rightBox instanceof InvokeExpr) {
 					InvokeExpr expr = (InvokeExpr) rightBox;
-					JimpleCodeGenerator.generateTraps(body, expr.getMethod(), units);
+					codeGenerator.generateTryCatch(expr.getMethod(), units);
 				}
 			} else if (u instanceof InvokeStmt) {
 				InvokeStmt invoke = (InvokeStmt) u;
 				InvokeExpr expr = invoke.getInvokeExpr();
-				JimpleCodeGenerator.generateTraps(body, expr.getMethod(), units);
+				codeGenerator.generateTryCatch(expr.getMethod(), units);
 			}
 		}
 
 	}
 
-	private List<Entry<String, String>> extractParameterVarNameFromRule(SootMethod forbiddenSootMethod,
-			SootMethod alternativeSootMethod) {
+	private List<Entry<String, String>> extractParameterVarNameFromRule(SootMethod forbiddenMethod,
+			SootMethod alternativeMethod) {
 
+		
 		List<CrySLForbiddenMethod> forbiddenCrySLMethods = violatedCrySLRule.getForbiddenMethods();
 		for (CrySLForbiddenMethod forbiddenCrySLMethod : forbiddenCrySLMethods) {
 			CrySLMethod innerCrySLMethod = forbiddenCrySLMethod.getMethod();
 
-			if (isMethodNameMatch(innerCrySLMethod, forbiddenSootMethod)) {
+			if (isMethodNameMatch(innerCrySLMethod, forbiddenMethod)) {
 
 				List<Entry<String, String>> innerCrySLMethodParamaters = innerCrySLMethod.getParameters();
 				List<String> crySLMethodParameterTypes = Lists.newArrayList();
@@ -173,7 +204,7 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 					crySLMethodParameterTypes.add(e.getValue());
 				}
 
-				List<Type> forbiddenSootMethodParameters = forbiddenSootMethod.getParameterTypes();
+				List<Type> forbiddenSootMethodParameters = forbiddenMethod.getParameterTypes();
 				List<String> forbiddenSootMethodParameterTypes = Lists.newArrayList();
 				for (Type t : forbiddenSootMethodParameters) {
 					forbiddenSootMethodParameterTypes.add(t.toString());
