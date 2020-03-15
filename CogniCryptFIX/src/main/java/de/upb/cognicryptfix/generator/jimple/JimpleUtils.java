@@ -1,29 +1,37 @@
 package de.upb.cognicryptfix.generator.jimple;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 
 import de.upb.cognicryptfix.utils.ByteConstant;
 import de.upb.cognicryptfix.utils.InitializationMethodSorter;
 import soot.Body;
+import soot.DoubleType;
 import soot.FastHierarchy;
+import soot.FloatType;
+import soot.IntType;
 import soot.Local;
+import soot.LongType;
 import soot.PrimType;
 import soot.Scene;
+import soot.ShortType;
 import soot.SootClass;
 import soot.SootMethod;
 import soot.Type;
+import soot.Unit;
+import soot.ValueBox;
+import soot.jimple.AssignStmt;
 import soot.jimple.Constant;
 import soot.jimple.DoubleConstant;
 import soot.jimple.IntConstant;
+import soot.jimple.InvokeExpr;
+import soot.jimple.InvokeStmt;
 import soot.jimple.LongConstant;
 import soot.jimple.NullConstant;
 import soot.jimple.StringConstant;
+import soot.jimple.internal.JimpleLocalBox;
 
 /**
  * @author Andre Sonntag
@@ -32,7 +40,7 @@ import soot.jimple.StringConstant;
 public class JimpleUtils {
 
 	private static FastHierarchy hierarchy = Scene.v().getOrMakeFastHierarchy();
-	
+
 	public static FastHierarchy getHierarchy() {
 		return hierarchy;
 	}
@@ -52,31 +60,48 @@ public class JimpleUtils {
 		Local local = body.getLocals().stream().filter(x -> name.equals(x.getName())).findAny().orElse(null);
 		return local;
 	}
-	
-	public static boolean isNumericPrimType(Type type) {
-		
-		Type intType = Scene.v().getType("java.lang.Integer");
-		Type doubleType = Scene.v().getType("java.lang.Double");
-		Type longType = Scene.v().getType("java.lang.Long");
-		Type shortType = Scene.v().getType("java.lang.Short");
-		Type floatType = Scene.v().getType("java.lang.Float"); 
-		
-		if(type instanceof PrimType) {
-			if(type == intType || type == doubleType || type == longType || type == shortType || type == floatType) {
-				return true;
+
+	public static Local getInvokeLocal(Unit u) {
+		Local invokeLocal = null;
+
+		if (u instanceof AssignStmt) {
+			AssignStmt assignStmt = (AssignStmt) u;
+			if (assignStmt.containsInvokeExpr()) {
+				InvokeExpr invokeExpr = (InvokeExpr) assignStmt.getRightOpBox().getValue();
+				if (invokeExpr.getMethod().getName().equals("getInstance")) {
+					invokeLocal = (Local) assignStmt.getLeftOp();
+				}
 			} else {
-				return false;
+				invokeLocal = (Local) assignStmt.getLeftOp();
 			}
+		} else if (u instanceof InvokeStmt) {
+			InvokeStmt invokeStmt = (InvokeStmt) u;
+			InvokeExpr invokeExpr = invokeStmt.getInvokeExpr();
+			invokeLocal = (Local) invokeExpr.getUseBoxes().stream().filter(useBox -> useBox instanceof JimpleLocalBox)
+					.map(ValueBox::getValue).findAny().orElse(null);
+
 		}
-		else {
-			return false;
-		}		
+		return invokeLocal;
 	}
-	
-	
-	
+
+	public static InvokeExpr getInvokeExpr(Unit u) {
+		InvokeExpr invokeExpr = null;
+
+		if (u instanceof AssignStmt) {
+			AssignStmt assignStmt = (AssignStmt) u;
+			if (assignStmt.containsInvokeExpr()) {
+				invokeExpr = (InvokeExpr) assignStmt.getRightOpBox().getValue();
+			}
+		} else if (u instanceof InvokeStmt) {
+			InvokeStmt invokeStmt = (InvokeStmt) u;
+			invokeExpr = invokeStmt.getInvokeExpr();
+		}
+
+		return invokeExpr;
+	}
+
 	public static Constant generateDummyValueForType(Type type) {
-		
+
 		Type objType = Scene.v().getType("java.lang.Object");
 		Type boolType = Scene.v().getType("java.lang.Boolean");
 		Type intType = Scene.v().getType("java.lang.Integer");
@@ -86,8 +111,11 @@ public class JimpleUtils {
 		Type stringType = Scene.v().getType("java.lang.String");
 		Type charType = Scene.v().getType("java.lang.Character");
 
-		if(type instanceof PrimType) {
-			if (type == boolType) {
+		if (type instanceof PrimType) {
+
+			if (type == objType) {
+				return generateConstantValue(new Object());
+			} else if (type == boolType) {
 				return generateConstantValue(true);
 			} else if (type == intType) {
 				return generateConstantValue(1);
@@ -103,19 +131,32 @@ public class JimpleUtils {
 				return generateConstantValue("");
 			} else {
 				throw new RuntimeException("error");
-			}		
+			}
 		}
-		return null; 
+		return null;
 	}
 	
-	/**
-	 * <p>
-	 * Converts a primitive data type into a Jimple {@link Constant}
-	 * </p>
-	 * 
-	 * @param object Object to be converted.
-	 * @return Returns the corresponding {@link Constant}.
-	 */
+	public static Constant generateConstantValue(Type type, String object) {
+		if(type == Scene.v().getType("java.lang.String")) {
+			return generateConstantValue(object);
+		}else if(type == Scene.v().getType("java.lang.String[]")) {
+				return generateConstantValue(object);
+		}else if (type == IntType.v()) {
+			return generateConstantValue(Integer.parseInt(object));
+		} else if(type == DoubleType.v()) {
+			return generateConstantValue(Double.parseDouble(object));
+		} else if(type == LongType.v()) {
+			return generateConstantValue(Long.parseLong(object));
+		} else if(type == ShortType.v()) {
+			return generateConstantValue(Short.parseShort(object));
+		} else if(type == FloatType.v()) {
+			return generateConstantValue(Float.parseFloat(object));
+			
+		} else {
+			throw new RuntimeException("unrecognized constant value = " + object);
+		}
+	}
+	
 	public static Constant generateConstantValue(Object object) {
 		if (object == null) {
 			return NullConstant.v();
@@ -135,8 +176,8 @@ public class JimpleUtils {
 		} else if (object instanceof Short) {
 			return LongConstant.v(((Short) object).shortValue());
 		} else if (object instanceof Character) {
-			return StringConstant.v(object+"");
-		} else if (object instanceof String) {			
+			return StringConstant.v(object + "");
+		} else if (object instanceof String) {
 			return StringConstant.v((String) object);
 		} else if (object instanceof Double) {
 			return DoubleConstant.v(((Double) object).doubleValue());
@@ -144,7 +185,21 @@ public class JimpleUtils {
 			throw new RuntimeException("unrecognized constant value = " + object);
 		}
 	}
-	
+
+	public static boolean isSubClassOrSubInterface(Type type, Type toCheck) {
+
+		SootClass superClass = Scene.v().loadClassAndSupport(type.toQuotedString());
+		SootClass subClass = Scene.v().loadClassAndSupport(toCheck.toQuotedString());
+
+		if (hierarchy.getAllSubinterfaces(superClass).contains(subClass)
+				|| hierarchy.getSubclassesOf(superClass).contains(subClass)
+				|| hierarchy.getAllImplementersOfInterface(superClass).contains(subClass)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
 	public static SootMethod getBestInitializationMethod(SootClass clazz) {
 		List<SootMethod> initMethods = Lists.newArrayList();
 		for (SootMethod method : clazz.getMethods()) {
@@ -155,22 +210,34 @@ public class JimpleUtils {
 		Collections.sort(initMethods, new InitializationMethodSorter());
 		return initMethods.get(0);
 	}
-	
-	
-	//TODO: not good enough
-	private static SootClass getImplementedInterface(SootClass clazz) {
-		HashMap<SootMethod,SootClass> implementationMap = Maps.newHashMap();
-		
-		List<SootClass> implementations = new ArrayList(hierarchy.getAllImplementersOfInterface(clazz));
-		for(SootClass implementation : implementations) {
-			implementationMap.put(getBestInitializationMethod(implementation),implementation);
-		}
-		
-		List<SootMethod> initMethods = Lists.newArrayList(implementationMap.keySet());
-		Collections.sort(initMethods, new InitializationMethodSorter());
-		
-		return implementationMap.get(initMethods);
-	}
 
-	
+//	// TODO: not good enough
+//	public static SootClass getImplementedInterface(SootClass clazz) {
+//		HashMap<SootMethod, SootClass> implementationMap = Maps.newHashMap();
+//
+//		List<SootClass> implementations = new ArrayList(hierarchy.getAllImplementersOfInterface(clazz));
+//		for (SootClass implementation : implementations) {
+//			implementationMap.put(getBestInitializationMethod(implementation), implementation);
+//		}
+//
+//		List<SootMethod> initMethods = Lists.newArrayList(implementationMap.keySet());
+//		Collections.sort(initMethods, new InitializationMethodSorter());
+//
+//		return implementationMap.get(initMethods);
+//	}
+//
+//	// TODO: not good enough
+//	public static SootClass getSubClass(SootClass clazz) {
+//		HashMap<SootMethod, SootClass> subclassMap = Maps.newHashMap();
+//		List<SootClass> subclasses = new ArrayList(hierarchy.getSubclassesOf(clazz));
+//		for (SootClass subclass : subclasses) {
+//			subclassMap.put(getBestInitializationMethod(subclass), subclass);
+//		}
+//
+//		List<SootMethod> initMethods = Lists.newArrayList(subclassMap.keySet());
+//		Collections.sort(initMethods, new InitializationMethodSorter());
+//
+//		return subclassMap.get(initMethods);
+//	}
+
 }
