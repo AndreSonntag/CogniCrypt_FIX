@@ -1,16 +1,14 @@
 package de.upb.cognicryptfix.utils;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 
@@ -23,13 +21,16 @@ import crypto.extractparameter.ExtractedValue;
 import crypto.interfaces.ISLConstraint;
 import crypto.rules.CrySLComparisonConstraint;
 import crypto.rules.CrySLConstraint;
+import crypto.rules.CrySLMethod;
 import crypto.rules.CrySLPredicate;
 import crypto.rules.CrySLRule;
 import crypto.rules.CrySLValueConstraint;
+import crypto.rules.TransitionEdge;
 import de.upb.cognicryptfix.analysis.CryptoAnalysis;
 import soot.IntType;
-import soot.SootClass;
+import soot.Scene;
 import soot.SootMethod;
+import soot.Type;
 import soot.Value;
 import soot.jimple.AssignStmt;
 import soot.jimple.Constant;
@@ -45,25 +46,28 @@ import soot.jimple.StringConstant;
 public class Utils {
 
 	private static final Logger logger = LogManager.getLogger(Utils.class);
+	
+	public static Type getType(CrySLRule rule, String var) {
+		ArrayList<TransitionEdge> transitions = new ArrayList<TransitionEdge>(
+				rule.getUsagePattern().getAllTransitions());
+		for (TransitionEdge transition : transitions) {
+			List<CrySLMethod> methods = transition.getLabel();
+			for (CrySLMethod method : methods) {
+				List<Entry<String, String>> parameters = method.getParameters();
+				for (Entry<String, String> parameter : parameters) {
+					if (parameter.getKey().equals(var)) {
+						return Scene.v().getTypeUnsafe(parameter.getValue());
+					}
+				}
 
-	private static HashMap<String,Class> wrapperMap;
-	static{
-		wrapperMap = new HashMap<String,Class>();
-		wrapperMap.put("int", Integer.class );
-		wrapperMap.put("long", Long.class );
-		wrapperMap.put("double", Double.class );
-		wrapperMap.put("float", Float.class );
-		wrapperMap.put("bool", Boolean.class );
-		wrapperMap.put("char", Character.class );
-		wrapperMap.put("byte", Byte.class );
-		wrapperMap.put("void", Void.class );
-		wrapperMap.put("short", Short.class );
+				Entry<String, String> ret = method.getRetObject();
+				if (ret.getKey().equals(var)) {
+					return Scene.v().getTypeUnsafe(ret.getValue());
+				}
+			}
+		}
+		return null;
 	}
-	
-	public static <T> Class<T> getWrapperClassByPrimeTypeName(String name) {
-		return wrapperMap.get(name);
-	}
-	
 	
 	public static AnalysisSeedWithSpecification createSeed(CrySLRule rule, SootMethod method) {
 
@@ -173,7 +177,18 @@ public class Utils {
 		return c == null || c.isEmpty();
 	}
 
-	
+	public static String getAppropriateVarName(CrySLRule rule) {
+		
+		String[] splitClassName = rule.getClassName().split("\\.");
+		String className = splitClassName[splitClassName.length-1];
+		String variableName = "gen";
+
+		for (int i = 0; i < className.length(); i++) {
+			char c = className.charAt(i);
+			variableName += Character.isUpperCase(c) ? c : ""; 
+		}
+		return variableName;
+	}
 	
 
 }
