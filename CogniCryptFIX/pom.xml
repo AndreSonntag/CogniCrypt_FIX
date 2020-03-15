@@ -12,7 +12,7 @@
 		<junit.version>4.13</junit.version>
 		<cryptoanalysis.version>2.7-SNAPSHOT</cryptoanalysis.version>
 		<guava.version>28.2-jre</guava.version>
-		<soot.version>4.0.0</soot.version>
+		<soot.version>4.1.0</soot.version>
 		<cryptsl.version>1.0.0-SNAPSHOT</cryptsl.version>
  	 	<spdsVersion>2.4</spdsVersion>		
 	</properties>
