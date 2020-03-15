@@ -122,7 +122,7 @@ public class NeverTypeOfPatch extends AbstractPatch {
 			patchValue = arrayLocal.toString() + " -> " + arrayAssign.toString();
 			wrapperAssignStmt.getRightOpBox().setValue(arrayLocal);
 			body.getUnits().insertBefore(generatedUnits.get(arrayLocal), wrapperAssignStmt);
-			System.out.println();
+//			System.out.println();
 		} else if (expectedType instanceof PrimType) {
 		} else if (expectedType == Scene.v().getType("java.lang.String")) {
 		}
