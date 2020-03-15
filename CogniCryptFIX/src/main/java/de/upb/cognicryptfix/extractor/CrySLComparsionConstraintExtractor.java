@@ -5,7 +5,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import crypto.analysis.AnalysisSeedWithSpecification;
-import crypto.interfaces.ISLConstraint;
 import crypto.rules.CrySLArithmeticConstraint;
 import crypto.rules.CrySLComparisonConstraint;
 import de.upb.cognicryptfix.extractor.constraints.ArithmeticConstraint;
