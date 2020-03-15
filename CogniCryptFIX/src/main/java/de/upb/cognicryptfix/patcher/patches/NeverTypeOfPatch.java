@@ -1,20 +1,14 @@
 package de.upb.cognicryptfix.patcher.patches;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-
-import javax.management.RuntimeErrorException;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.primitives.Primitives;
-import com.sun.javafx.binding.LongConstant;
 
 import boomerang.callgraph.ObservableICFG;
 import boomerang.jimple.Statement;
@@ -24,11 +18,8 @@ import crypto.rules.CrySLRule;
 import de.upb.cognicryptfix.analysis.CryptoAnalysis;
 import de.upb.cognicryptfix.extractor.constraints.IConstraint;
 import de.upb.cognicryptfix.generator.JimpleCodeGenerator;
-import de.upb.cognicryptfix.generator.jimple.JimpleCallGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
 import de.upb.cognicryptfix.utils.BoomerangUtils;
-import de.upb.cognicryptfix.utils.Utils;
-import javassist.compiler.ast.DoubleConst;
 import soot.ArrayType;
 import soot.Body;
 import soot.ByteType;
@@ -41,15 +32,9 @@ import soot.SootMethod;
 import soot.Type;
 import soot.Unit;
 import soot.Value;
-import soot.ValueBox;
 import soot.jimple.AssignStmt;
-import soot.jimple.IntConstant;
 import soot.jimple.InvokeExpr;
-import soot.jimple.Jimple;
-import soot.jimple.StaticInvokeExpr;
 import soot.jimple.StringConstant;
-import soot.jimple.internal.JAssignStmt;
-import soot.jimple.internal.JimpleLocal;
 
 public class NeverTypeOfPatch extends AbstractPatch {
 
