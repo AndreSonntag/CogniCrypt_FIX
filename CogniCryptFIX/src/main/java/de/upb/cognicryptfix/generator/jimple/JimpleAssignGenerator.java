@@ -14,8 +14,7 @@ import soot.jimple.Jimple;
  */
 public class JimpleAssignGenerator {
 
-	public JimpleAssignGenerator() {
-	}
+	public JimpleAssignGenerator() {}
 	
 	
 	/**

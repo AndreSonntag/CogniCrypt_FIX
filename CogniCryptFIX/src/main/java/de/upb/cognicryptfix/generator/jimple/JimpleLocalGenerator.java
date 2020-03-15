@@ -1,5 +1,6 @@
 package de.upb.cognicryptfix.generator.jimple;
 
+import soot.ArrayType;
 import soot.Body;
 import soot.Local;
 import soot.Type;
@@ -74,7 +75,11 @@ public class JimpleLocalGenerator {
 	 * @return Returns a fresh generated {@link Local} array variable.
 	 */
 	public Local generateFreshArrayLocal(Type type, int dimension) {
-		return generateFreshLocal(JimpleTypeGenerator.generateArrayType(type, dimension));
+		if(type instanceof ArrayType) {
+			return generateFreshLocal(type);
+		} else {
+			return generateFreshLocal(JimpleTypeGenerator.generateArrayType(type, dimension));
+		}
 	}
 	
 	/**
@@ -89,8 +94,12 @@ public class JimpleLocalGenerator {
 	 * @return Returns a fresh generated {@link Local} Array variable.
 	 */
 	public Local genereateFreshArrayLocal(Type type, String name, int dimension) {
-		//TODO: if type is already ArrayType
-		return generateFreshLocal(JimpleTypeGenerator.generateArrayType(type, dimension), name);
+		
+		if(type instanceof ArrayType) {
+			return generateFreshLocal(type,name);
+		} else {
+			return generateFreshLocal(JimpleTypeGenerator.generateArrayType(type, dimension), name);
+		}
 	}
 
 }

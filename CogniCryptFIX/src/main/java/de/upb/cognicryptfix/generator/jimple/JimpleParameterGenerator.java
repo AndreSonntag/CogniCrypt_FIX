@@ -99,16 +99,21 @@ public class JimpleParameterGenerator {
 			
 			RefType refType = (RefType) type;
 			SootClass clazz = refType.getSootClass();
-			SootMethod initMethod = JimpleUtils.getBestInitializationMethod(clazz);
-
+			SootMethod initMethod = JimpleUtils.getBestInitializationMethod(clazz);;
+			
 			// TODO: check if clazz is abstract or an interface, if yes find the beste subclass!
+			
+			// Check if a rule exist for the clazz (predicate)
+			
 //			if (clazz.isAbstract()) {
+//				clazz = JimpleUtils.getSubClass(clazz);
+//				initMethod = JimpleUtils.getBestInitializationMethod(clazz);
 //
 //			} else if (clazz.isInterface()) {
-//				clazz = getImplementedInterface(clazz);
-//				initMethod = getBestInitializationMethod(clazz);
+//				clazz = JimpleUtils.getImplementedInterface(clazz);
+//				initMethod = JimpleUtils.getBestInitializationMethod(clazz);
 //			} else {
-//				initMethod = getBestInitializationMethod(clazz);
+//				initMethod = JimpleUtils.getBestInitializationMethod(clazz);
 //			}
 
 			List<Type> parameterTypes = initMethod.getParameterTypes();
@@ -121,12 +126,7 @@ public class JimpleParameterGenerator {
 
 			Local refTypeLocal = localGenerator.generateFreshLocal(refType, name);
 			Local[] RefTypeParameterLocals = generatedRefTypeParameterUnits.keySet().toArray(new Local[0]);
-
-			if (initMethod.isStatic()) {	// getInstance()
-				generatedUnits.putAll(callGenerator.generateCallUnits(refTypeLocal, initMethod, RefTypeParameterLocals));			
-			} else {	// constructor
-				generatedUnits.putAll(callGenerator.generateConstructorCallUnits(refTypeLocal, initMethod, RefTypeParameterLocals));			
-			}
+			generatedUnits.putAll(callGenerator.generateCallUnits(refTypeLocal, initMethod, RefTypeParameterLocals));			
 		}
 		return generatedUnits;
 	}

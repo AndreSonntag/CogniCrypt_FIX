@@ -7,6 +7,7 @@ import java.util.List;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
+import de.upb.cognicryptfix.crysl.CrySLEntityPool;
 import de.upb.cognicryptfix.generator.jimple.JimpleArrayGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleCallGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleInvokeGenerator;
@@ -32,7 +33,7 @@ public class JimpleCodeGenerator {
 	private JimpleTrapGenerator trapGenerator;
 	private JimpleInvokeGenerator invokeGenerator;
 	private JimpleArrayGenerator arrayGenerator;
-	
+	private CrySLEntityPool fsm;
 	
 	private JimpleCodeGenerator(Body body) {
 		this.body = body;
@@ -50,27 +51,14 @@ public class JimpleCodeGenerator {
 		return JimpleCodeGenerator.instance;
 	}
 	
-	public HashMap<Local, List<Unit>> generateCall(Local var, SootMethod method, Local... parameterLocals){
-		LinkedHashMap<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 
-		if(method.isConstructor()) {
-			generatedUnits.putAll(callGenerator.generateConstructorCallUnits(var, method, parameterLocals));
-		}
-		else {
-			List<Unit> units = Lists.newArrayList();
-			units.add(invokeGenerator.generateInvokeStmt(var, method, parameterLocals));
-			generatedUnits.put(var, units);
-		}
-		return generatedUnits;
+	//currently it is here not possible to use the returned object :/
+	public HashMap<Local, List<Unit>> generateCall(Local var, SootMethod method, Local... parameterLocals){
+		return callGenerator.generateCallUnits(var, method, parameterLocals);
 	}
 		
 	public HashMap<Local, List<Unit>> generateParametersForCall(SootMethod method, List<String> parameterNames, List<Object> parameterValues){
 		return parameterGenerator.generateParameterUnits(method, parameterNames, parameterValues);
-	}
-	
-	public HashMap<Local, List<Unit>> generateCallWithParameters(){
-		// TODO: implementation left
-		return null;
 	}
 	
 	public void generateTryCatch(SootMethod method, List<Unit> tryUnits) {
