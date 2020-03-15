@@ -18,6 +18,7 @@ import crypto.rules.CrySLForbiddenMethod;
 import crypto.rules.CrySLMethod;
 import crypto.rules.CrySLRule;
 import de.upb.cognicryptfix.generator.JimpleCodeGenerator;
+import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
 import de.upb.cognicryptfix.utils.Utils;
 import soot.Body;
 import soot.Local;
@@ -44,7 +45,6 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 	private String brokenJimpleCode;
 	private String patchValue;
 	private JimpleCodeGenerator codeGenerator;
-	
 	
 	public ForbiddenMethodPatch(ForbiddenMethodError error) {
 		this.error = error;
@@ -76,36 +76,20 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 		Local[] parameterLocals = generatedParameterUnits.keySet().toArray(new Local[0]);
 		generateAndInsertAlternativeInvokeExpr(body, forbiddenMethod, forbiddenUnit, alternativeMethod, parameterLocals);
 //		alternatives.get(0).addException(Scene.v().getSootClass("java.io.IOException"));	//Test purpose
-		generateTraps(body, Arrays.asList(forbiddenUnit));
+		generateTraps(Arrays.asList(forbiddenUnit));
 
 		for (List<Unit> unitList : generatedParameterUnits.values()) {
-			generateTraps(body, unitList);
+			generateTraps(unitList);
 		}
 	}
 
 	private void generateAndInsertAlternativeInvokeExpr(Body body, SootMethod forbiddenMethod, Unit forbiddenUnit,
 			SootMethod alternativeMethod, Local[] alternativeParameterLocals) {
 
-		boolean isAssignStmt = false;
-		InvokeExpr forbiddenInvokeExpr = null;
-
-		// extract forbidden InvokeExpr
-		if (forbiddenUnit instanceof AssignStmt) { // i.e. "cipherText = c.doFinal();"
-			isAssignStmt = true;
-			AssignStmt assign = (AssignStmt) forbiddenUnit;
-			forbiddenInvokeExpr = (InvokeExpr) assign.getRightOpBox().getValue();
-
-		} else if (forbiddenUnit instanceof InvokeStmt) { // i.e. "c.init()"
-			InvokeStmt invoke = (InvokeStmt) forbiddenUnit;
-			forbiddenInvokeExpr = invoke.getInvokeExpr();
-		}
-
-		// extract Local from InvokeExpr
-		Local invokeVarLocal = (Local) forbiddenInvokeExpr.getUseBoxes().stream()
-				.filter(useBox -> useBox instanceof JimpleLocalBox).map(ValueBox::getValue).findAny().orElse(null);
-
+		Local invokeLocal = JimpleUtils.getInvokeLocal(forbiddenUnit);
+		
 		// generate the alternative InvokeExpr for alternative Method
-		HashMap<Local, List<Unit>> generatedUnits = codeGenerator.generateCall(invokeVarLocal, alternativeMethod, alternativeParameterLocals);
+		HashMap<Local, List<Unit>> generatedUnits = codeGenerator.generateCall(invokeLocal, alternativeMethod, alternativeParameterLocals);
 
 		Unit alternativeInvokeUnit = null;
 		InvokeExpr alternativeInvokeExpr = null;
@@ -116,9 +100,9 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 		if(alternativeMethod.isConstructor()) {
 			if(forbiddenMethod.isConstructor()) {
 				alternativeInvokeExpr = ((InvokeStmt) alternativeInvokeUnit).getInvokeExpr();
-
+				
 				// replace forbidden InvokeExpr by alternative InvokeExpr
-				if (isAssignStmt) {
+				if(forbiddenUnit instanceof AssignStmt) {
 					AssignStmt assign = (AssignStmt) forbiddenUnit;
 					assign.getRightOpBox().setValue((Value) alternativeInvokeExpr);
 				} else {
@@ -134,8 +118,7 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 		else {
 			alternativeInvokeExpr = ((InvokeStmt) alternativeInvokeUnit).getInvokeExpr();
 			
-			// replace forbidden InvokeExpr by alternative InvokeExpr
-			if (isAssignStmt) {
+			if(forbiddenUnit instanceof AssignStmt) {
 				AssignStmt assign = (AssignStmt) forbiddenUnit;
 				assign.getRightOpBox().setValue((Value) alternativeInvokeExpr);
 
@@ -165,11 +148,13 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 			parameterUnits.addAll(l);
 		}
 
-		body.getUnits().insertBefore(parameterUnits, forbiddenUnit);
+		if(!parameterUnits.isEmpty()) {
+			body.getUnits().insertBefore(parameterUnits, forbiddenUnit);
+		}
 		return generatedUnits;
 	}
 
-	private void generateTraps(Body body, List<Unit> units) {
+	private void generateTraps(List<Unit> units) {
 
 		for (Unit u : units) {
 			if (u instanceof AssignStmt) {
