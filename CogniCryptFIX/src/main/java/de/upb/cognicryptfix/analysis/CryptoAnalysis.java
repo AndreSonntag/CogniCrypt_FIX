@@ -16,8 +16,6 @@ import boomerang.preanalysis.BoomerangPretransformer;
 import crypto.analysis.CrySLAnalysisListener;
 import crypto.analysis.CryptoScanner;
 import crypto.rules.CrySLRule;
-import de.upb.cognicryptfix.Constants;
-import de.upb.cognicryptfix.utils.CrySLReaderUtils;
 import de.upb.cognicryptfix.utils.MavenProject;
 import soot.G;
 import soot.PackManager;
@@ -35,14 +33,19 @@ import soot.options.Options;
 public class CryptoAnalysis {
 	
 	private static final Logger logger = LogManager.getLogger(CryptoAnalysis.class.getSimpleName());
-	private static CG DEFAULT_CALL_GRAPH = CG.CHA;
+	private CG DEFAULT_CALL_GRAPH = CG.CHA;
+	private List<CrySLRule> rules;
 	public static CryptoScanner staticScanner = null;
 	
 	public static enum CG {
 		CHA, SPARK_LIBRARY, SPARK
 	}
+	
+	public CryptoAnalysis(List<CrySLRule> rules) {
+		this.rules = rules;
+	}
 
-	private static SceneTransformer createAnalysisTransformer(final CrySLAnalysisListener listener) {
+	private SceneTransformer createAnalysisTransformer(final CrySLAnalysisListener listener) {
 		return new SceneTransformer() {
 
 			@Override
@@ -58,13 +61,13 @@ public class CryptoAnalysis {
 				};
 				staticScanner = scanner;
 				scanner.getAnalysisListener().addReportListener(listener);
-				scanner.scan(CrySLReaderUtils.readRulesFromSourceFiles(Constants.crySLRulePath));
+				scanner.scan(rules);
 			}
 		};
 	}
 	
 	
-	public static boolean runSoot(final MavenProject project, final CrySLAnalysisListener listener) {
+	public boolean runSoot(final MavenProject project, final CrySLAnalysisListener listener) {
 		G.reset();
 		setSootOptions(project);
 		registerTransformers(listener);
@@ -78,25 +81,18 @@ public class CryptoAnalysis {
 		return true;
 	}
 	
-	private static void runSoot() {
+	private void runSoot() {
 		Scene.v().loadNecessaryClasses();
 		PackManager.v().getPack("cg").apply();
 		PackManager.v().getPack("wjtp").apply();
 	}
 
-	private static void setSootOptions(final MavenProject project) {
-//		Options.v().set_src_prec(3);
-		Options.v().set_soot_classpath(getSootClasspath(project));
-		Options.v().set_process_dir(Lists.newArrayList(project.getBuildDirectory()));
-		Options.v().set_keep_line_number(true);
-		Options.v().set_prepend_classpath(true);
-		Options.v().set_allow_phantom_refs(true);
-		Options.v().set_whole_program(true);
-		Options.v().set_no_bodies_for_excluded(true);
-		Options.v().set_include(getIncludeList());
-		Options.v().set_exclude(getExcludeList());
-		Scene.v().loadNecessaryClasses();
+	private void setSootOptions(final MavenProject project) {
+//		Options.v().set_src_prec(3);	//input JimpleFiles! 
+		Options.v().set_soot_classpath(getSootClasspath(project)+ File.pathSeparator + pathToJCE());
 
+		Options.v().set_process_dir(Lists.newArrayList(project.getBuildDirectory()));
+		
 		switch (DEFAULT_CALL_GRAPH.ordinal()) {
 		case 2:
 			Options.v().setPhaseOption("cg.spark", "on");
@@ -107,13 +103,30 @@ public class CryptoAnalysis {
 			Options.v().setPhaseOption("cg.cha", "on");
 			Options.v().setPhaseOption("cg", "all-reachable:true");
 		}
-
 		Options.v().setPhaseOption("jb", "use-original-names:true");
+		Options.v().set_keep_line_number(true);
+		Options.v().set_prepend_classpath(true);
 		Options.v().set_output_format(Options.output_format_none);
+		Options.v().set_allow_phantom_refs(true);
+		Options.v().set_whole_program(true);
+		Options.v().set_no_bodies_for_excluded(true);
+		Options.v().set_include(getIncludeList());
+		Options.v().set_exclude(getExcludeList());
+		Options.v().set_full_resolver(true);
+		loadAndSupportNotResolvedClasses();
+		Scene.v().loadNecessaryClasses();
 		logger.info("initializing soot");
 	}
-
-	private static List<String> getIncludeList() {
+	
+	private void loadAndSupportNotResolvedClasses() {
+		for(CrySLRule rule : rules) {
+			if(!Scene.v().containsClass(rule.getClassName())) {
+				Scene.v().loadClassAndSupport(rule.getClassName());
+			}
+		}
+	}
+	
+	private List<String> getIncludeList() {
 		final List<String> includeList = new LinkedList<String>();
 		includeList.add("java.lang.AbstractStringBuilder");
 		includeList.add("java.lang.Boolean");
@@ -128,20 +141,25 @@ public class CryptoAnalysis {
 		return includeList;
 	}
 	
-	private static List<String> getExcludeList() {
+	private List<String> getExcludeList() {
 		final List<String> excludeList = new LinkedList<String>();
-		for (final CrySLRule r : CrySLReaderUtils.readRulesFromSourceFiles(Constants.crySLRulePath)) {
+		for (final CrySLRule r : rules) {
 			excludeList.add(crypto.Utils.getFullyQualifiedName(r));
 		}
 		return excludeList;
 	}
 
-	private static void registerTransformers(final CrySLAnalysisListener listener) {
+	private void registerTransformers(final CrySLAnalysisListener listener) {
 		PackManager.v().getPack("wjtp").add(new Transform("wjtp.ifds", createAnalysisTransformer(listener)));
 	}
 	
-	private static String getSootClasspath(final MavenProject project) {
+	private String getSootClasspath(final MavenProject project) {
 		String sootClasspath = project.getBuildDirectory()+(project.getFullClassPath().equals("") ? "": File.pathSeparator+ project.getFullClassPath());
 		return sootClasspath;
+	}
+	
+	private String pathToJCE() {
+		// When whole program mode is disabled, the classpath misses jce.jar
+		return System.getProperty("java.home") + File.separator + "lib" + File.separator + "jce.jar";
 	}
 }
