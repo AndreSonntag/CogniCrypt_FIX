@@ -13,6 +13,7 @@ import crypto.analysis.CrySLResultsReporter;
 import crypto.analysis.errors.AbstractError;
 import crypto.analysis.errors.ConstraintError;
 import crypto.analysis.errors.ForbiddenMethodError;
+import crypto.analysis.errors.IncompleteOperationError;
 import crypto.analysis.errors.NeverTypeOfError;
 import crypto.constraints.ConstraintSolver;
 import crypto.interfaces.ISLConstraint;
@@ -20,6 +21,7 @@ import crypto.rules.CrySLComparisonConstraint;
 import crypto.rules.CrySLPredicate;
 import crypto.rules.CrySLValueConstraint;
 import de.upb.cognicryptfix.analysis.CryptoAnalysisListener;
+import de.upb.cognicryptfix.crysl.CrySLEntityPool;
 import de.upb.cognicryptfix.extractor.CrySLComparsionConstraintExtractor;
 import de.upb.cognicryptfix.extractor.CrySLPredicateExtractor;
 import de.upb.cognicryptfix.extractor.CrySLValueConstraintExtractor;
@@ -27,11 +29,14 @@ import de.upb.cognicryptfix.extractor.constraints.ComparisonConstraint;
 import de.upb.cognicryptfix.extractor.constraints.PredicateConstraint;
 import de.upb.cognicryptfix.extractor.constraints.ValueConstraint;
 import de.upb.cognicryptfix.patcher.patches.ForbiddenMethodPatch;
+import de.upb.cognicryptfix.patcher.patches.IncompleteOperationPatch;
 import de.upb.cognicryptfix.patcher.patches.NeverTypeOfPatch;
 import de.upb.cognicryptfix.patcher.patches.PrimitiveConstraintPatch;
 import de.upb.cognicryptfix.utils.Utils;
 import soot.Body;
+import soot.Scene;
 import soot.SootClass;
+import soot.util.Chain;
 
 /**
  * @author Andre Sonntag
@@ -45,12 +50,7 @@ public class JimplePatcher implements IPatcher{
 	public SootClass getPatchedClass(AbstractError error) {
 		SootClass errorClass = error.getErrorLocation().getMethod().getDeclaringClass();
 		Body patchedBody = createPatch(error);
-//		int errorCounter = verifyPatch2(error);
-//		if(errorCounter > 0) {
-//			patchedBody = createPatch(error);
-//			errorCounter = verifyPatch2(error);
-//		}
-		
+
 		
 	//	error.getErrorLocation().getMethod().setActiveBody(patchedBody);
 
@@ -59,8 +59,14 @@ public class JimplePatcher implements IPatcher{
 	
 	private Body createPatch(AbstractError error) {
 		Body patchedJimpleBody = error.getErrorLocation().getMethod().getActiveBody();
-		
-		if (error instanceof ForbiddenMethodError) {
+	
+		if(error instanceof IncompleteOperationError) {
+			IncompleteOperationError incompleteError = (IncompleteOperationError) error;
+			logger.info("Create patch for "+incompleteError.getClass().getSimpleName());
+			IncompleteOperationPatch patch = new IncompleteOperationPatch(incompleteError);
+			patch.getPatch();
+		}
+		else if (error instanceof ForbiddenMethodError) {
 			ForbiddenMethodError fMethodError = (ForbiddenMethodError) error;			
 			ForbiddenMethodPatch patch = new ForbiddenMethodPatch(fMethodError);
 			patch.getPatch();
@@ -98,7 +104,6 @@ public class JimplePatcher implements IPatcher{
 				}
 				if(brokenCon instanceof CrySLValueConstraint) {
 					logger.info("Create patch for "+conError.getClass().getSimpleName() +"_"+brokenCon.getClass().getSimpleName()+" :" + conError.toErrorMarkerString());
-
 					CrySLValueConstraintExtractor extractor = new CrySLValueConstraintExtractor(seed, (CrySLValueConstraint) brokenCon);
 					ValueConstraint valCon = extractor.extract();
 					PrimitiveConstraintPatch patch = new PrimitiveConstraintPatch(conError, valCon);
