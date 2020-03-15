@@ -33,14 +33,4 @@ public class ValueConstraint implements IConstraint{
 	public List<String> getExpectedValueList() {
 		return expectedConstraintValueList;
 	}
-
-	
-	
-	
-	
-
-
-	
-	
-
 }

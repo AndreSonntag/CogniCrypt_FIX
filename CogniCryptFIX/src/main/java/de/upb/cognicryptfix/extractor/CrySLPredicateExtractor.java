@@ -67,6 +67,8 @@ public class CrySLPredicateExtractor {
 	
 	/*
 	 * We need to use the first and the last propagated type, since the CrySL rule object does not store if a datatype is an array or not
+	 * 
+	 * TODO: can be replace by CrySLEntity type.
 	 */
 	private PredicateConstraint handleNeverTypeOf(String variable)
 	{

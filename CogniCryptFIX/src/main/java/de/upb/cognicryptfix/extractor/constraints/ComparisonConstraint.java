@@ -38,12 +38,12 @@ public class ComparisonConstraint implements IConstraint{
 		return rightAritCon.resolveConstraint();
 	}
 	
-	private String resolveComparsionOperator(CompOp op) {
+	public static String resolveComparsionOperator(CompOp op) {
 		switch (op) {
 		case l:
 			return "<";
 		case le:
-			return "<";
+			return "<=";
 		case g:
 			return ">";
 		case ge:
@@ -59,8 +59,4 @@ public class ComparisonConstraint implements IConstraint{
 	public String toString() {
 		return "SimpleConstraint [operator:" + resolveComparsionOperator(operator) + ", leftSubCon:" + leftAritCon.toString() + ", rightSubCon:" + rightAritCon.toString() + "]";
 	}
-
-	
-
-
 }
