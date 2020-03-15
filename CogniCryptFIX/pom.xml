@@ -13,7 +13,7 @@
 		<cryptoanalysis.version>2.7-SNAPSHOT</cryptoanalysis.version>
 		<guava.version>28.2-jre</guava.version>
 		<soot.version>4.1.0</soot.version>
-		<cryptsl.version>2.0.0-SNAPSHOT</cryptsl.version>
+		<crysl.version>2.0.0-SNAPSHOT</crysl.version>
  	 	<spdsVersion>2.4</spdsVersion>		
 	</properties>
 
@@ -54,9 +54,9 @@
 			<version>${cryptoanalysis.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>de.darmstadt.tu.crossing.CryptSL</groupId>
-			<artifactId>de.darmstadt.tu.crossing.CryptSL</artifactId>
-			<version>${cryptsl.version}</version>
+			<groupId>de.darmstadt.tu.crossing.CrySL</groupId>
+			<artifactId>de.darmstadt.tu.crossing.CrySL</artifactId>
+			<version>${crysl.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.google.guava</groupId>
