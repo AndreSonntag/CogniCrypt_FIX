@@ -24,6 +24,7 @@ import crypto.analysis.IAnalysisSeed;
 import crypto.analysis.errors.AbstractError;
 import crypto.analysis.errors.ConstraintError;
 import crypto.analysis.errors.ForbiddenMethodError;
+import crypto.analysis.errors.IncompleteOperationError;
 import crypto.analysis.errors.NeverTypeOfError;
 import crypto.extractparameter.CallSiteWithParamIndex;
 import crypto.extractparameter.ExtractedValue;
@@ -46,17 +47,20 @@ public class CryptoAnalysisListener extends CrySLAnalysisListener{
 	private List<AbstractError> fMethodError;
 	private List<AbstractError> nTypeOfError;
 	private List<AbstractError> compValueError;
+	private List<AbstractError> incompleteError;
+
 	
 	public CryptoAnalysisListener() {
 		errors = Lists.newArrayList();
 		fMethodError = Lists.newArrayList();
 		nTypeOfError = Lists.newArrayList();
 		compValueError = Lists.newArrayList();
+		incompleteError = Lists.newArrayList();
 	}
 	
 	
 	public void reportError(AbstractError error) {
-			
+		
 		if(error instanceof ForbiddenMethodError) {
 			fMethodError.add(error);
 		}
@@ -66,7 +70,9 @@ public class CryptoAnalysisListener extends CrySLAnalysisListener{
 		else if(error instanceof ConstraintError) {
 			compValueError.add(error);
 		}
-		
+		else if(error instanceof IncompleteOperationError) {
+			incompleteError.add(error);
+		}
 		
 		
 	}
@@ -74,6 +80,7 @@ public class CryptoAnalysisListener extends CrySLAnalysisListener{
 	
 	public void afterAnalysis() {
 		
+		errors.addAll(incompleteError);
 		errors.addAll(fMethodError);
 		errors.addAll(nTypeOfError);
 		errors.addAll(compValueError);
