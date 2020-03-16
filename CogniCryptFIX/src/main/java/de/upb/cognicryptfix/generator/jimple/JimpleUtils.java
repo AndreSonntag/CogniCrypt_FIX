@@ -8,6 +8,8 @@ import com.google.common.collect.Lists;
 import de.upb.cognicryptfix.utils.ByteConstant;
 import de.upb.cognicryptfix.utils.InitializationMethodSorter;
 import soot.Body;
+import soot.BooleanType;
+import soot.ByteType;
 import soot.DoubleType;
 import soot.FastHierarchy;
 import soot.FloatType;
@@ -110,24 +112,27 @@ public class JimpleUtils {
 		Type shortType = Scene.v().getType("java.lang.Short");
 		Type stringType = Scene.v().getType("java.lang.String");
 		Type charType = Scene.v().getType("java.lang.Character");
+		Type byteType = Scene.v().getType("java.lang.Byte");
 
 		if (type instanceof PrimType) {
 
 			if (type == objType) {
 				return generateConstantValue(new Object());
-			} else if (type == boolType) {
+			} else if (type == BooleanType.v()) {
 				return generateConstantValue(true);
-			} else if (type == intType) {
+			} else if (type == IntType.v()) {
 				return generateConstantValue(1);
-			} else if (type == doubleType) {
+			} else if (type == DoubleType.v()) {
 				return generateConstantValue(1.0);
-			} else if (type == longType) {
+			} else if (type == LongType.v()) {
 				return generateConstantValue(1L);
-			} else if (type == shortType) {
+			} else if (type == ShortType.v()) {
 				return generateConstantValue(1);
+			} else if (type == ByteType.v()) {
+				return generateConstantValue((byte) 10);
 			} else if (type == charType) {
 				return generateConstantValue('c');
-			} else if (type == stringType) {
+			} else if (type == Scene.v().getType("java.lang.String")) {
 				return generateConstantValue("");
 			} else {
 				throw new RuntimeException("error");
@@ -151,7 +156,8 @@ public class JimpleUtils {
 			return generateConstantValue(Short.parseShort(object));
 		} else if(type == FloatType.v()) {
 			return generateConstantValue(Float.parseFloat(object));
-			
+		} else if(type == ByteType.v()) {
+			return generateConstantValue(Byte.parseByte(object));	
 		} else {
 			throw new RuntimeException("unrecognized constant value = " + object);
 		}
@@ -186,12 +192,14 @@ public class JimpleUtils {
 		}
 	}
 
-	public static boolean isSubClassOrSubInterface(Type type, Type toCheck) {
+	public static boolean isEqualOrSubClassOrSubInterface(Type type, Type toCheck) {
 
 		SootClass superClass = Scene.v().loadClassAndSupport(type.toQuotedString());
 		SootClass subClass = Scene.v().loadClassAndSupport(toCheck.toQuotedString());
 
-		if (hierarchy.getAllSubinterfaces(superClass).contains(subClass)
+		if(type == toCheck) {
+			return true;
+		} else if (hierarchy.getAllSubinterfaces(superClass).contains(subClass)
 				|| hierarchy.getSubclassesOf(superClass).contains(subClass)
 				|| hierarchy.getAllImplementersOfInterface(superClass).contains(subClass)) {
 			return true;

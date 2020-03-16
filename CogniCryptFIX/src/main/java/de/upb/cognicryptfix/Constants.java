@@ -15,4 +15,5 @@ public class Constants {
 	public final static List<String> predefinedPreds = Arrays.asList("callTo", "noCallTo", "neverTypeOf", "length",
 			"notHardCoded");
 
+	public final static List<String> notSupportedPredicates = Arrays.asList("generatedManagerFactoryParameters");
 }

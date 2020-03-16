@@ -49,11 +49,7 @@ public class JimplePatcher implements IPatcher{
 	
 	public SootClass getPatchedClass(AbstractError error) {
 		SootClass errorClass = error.getErrorLocation().getMethod().getDeclaringClass();
-		Body patchedBody = createPatch(error);
-
-		
-	//	error.getErrorLocation().getMethod().setActiveBody(patchedBody);
-
+		error.getErrorLocation().getMethod().setActiveBody(createPatch(error));
 		return errorClass;
 	}
 	

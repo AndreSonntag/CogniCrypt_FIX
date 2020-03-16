@@ -27,6 +27,8 @@ import crypto.rules.CrySLRule;
 import crypto.rules.CrySLValueConstraint;
 import crypto.rules.TransitionEdge;
 import de.upb.cognicryptfix.analysis.CryptoAnalysis;
+import de.upb.cognicryptfix.crysl.CrySLEntity;
+import de.upb.cognicryptfix.crysl.CrySLMethodCall;
 import soot.IntType;
 import soot.Scene;
 import soot.SootMethod;
@@ -190,5 +192,15 @@ public class Utils {
 		return variableName;
 	}
 	
+	public static void printCallPath(CrySLRule producer, List<CrySLMethodCall> path) {
+
+		StringBuilder builder = new StringBuilder();
+		builder.append("****" + producer.getClassName() +"\n");
+		for (CrySLMethodCall call : path) {
+			builder.append("- " + call.getSootMethod().getSignature() + "\n");
+		}
+
+		System.out.println(builder.toString());
+	}
 
 }

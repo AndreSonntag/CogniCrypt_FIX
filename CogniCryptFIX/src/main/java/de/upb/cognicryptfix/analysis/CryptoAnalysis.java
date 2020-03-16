@@ -75,6 +75,7 @@ public class CryptoAnalysis {
 			runSoot();
 		}
 		catch (final Exception t) {
+			t.printStackTrace();
 			logger.error(t);
 			return false;
 		}

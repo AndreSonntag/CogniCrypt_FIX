@@ -8,6 +8,7 @@ import soot.util.Switch;
 
 public class ByteConstant extends ArithmeticConstant {
 
+	private static final long serialVersionUID = 1L;
 	public final int value;
 
 	protected ByteConstant(int value) {
