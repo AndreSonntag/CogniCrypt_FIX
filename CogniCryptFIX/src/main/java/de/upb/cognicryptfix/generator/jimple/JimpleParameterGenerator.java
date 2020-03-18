@@ -3,6 +3,8 @@ package de.upb.cognicryptfix.generator.jimple;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -13,6 +15,7 @@ import soot.Body;
 import soot.Local;
 import soot.PrimType;
 import soot.RefType;
+import soot.Scene;
 import soot.SootClass;
 import soot.SootMethod;
 import soot.Type;
@@ -25,22 +28,19 @@ import soot.Value;
  */
 public class JimpleParameterGenerator {
 
-	private Body body;
 	private JimpleLocalGenerator localGenerator;
 	private JimpleAssignGenerator assignGenerator;
 	private JimpleCallGenerator callGenerator;
 	
 	public JimpleParameterGenerator(Body body) {
-		this.body = body;
 		this.localGenerator = new JimpleLocalGenerator(body);
 		this.assignGenerator = new JimpleAssignGenerator();
 		this.callGenerator = new JimpleCallGenerator(body);
 	}
 	
-	public HashMap<Local, List<Unit>> generateParameterUnits(SootMethod method, List<String> names,
-			List<Object> values) {
+	public Map<Local, List<Unit>> generateParameterUnits(SootMethod method, List<String> names, List<Object> values) {
 
-		LinkedHashMap<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
+		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 		List<Type> types = method.getParameterTypes();
 		boolean namesAvailable = true;
 		boolean valuesAvailable = true;
@@ -62,71 +62,57 @@ public class JimpleParameterGenerator {
 			}
 		} else if (namesAvailable && !valuesAvailable) {
 			for (int i = 0; i < types.size(); i++) {
-				generatedUnits.putAll(generateParameterUnit(types.get(i), names.get(i), 1));
+				generatedUnits.putAll(generateParameterUnit(types.get(i), names.get(i), null));
 			}
 		} else {
 			for (Type parameterType : types) {
-				generatedUnits.putAll(generateParameterUnit(parameterType, "", 1));
+				generatedUnits.putAll(generateParameterUnit(parameterType, "", null));
 			}
 		}
 
 		return generatedUnits;
 	}
 
-	private HashMap<Local, List<Unit>> generateParameterUnit(Type type, String name, Object value) {
-		HashMap<Local, List<Unit>> generatedUnits = Maps.newHashMap();
+	private Map<Local, List<Unit>> generateParameterUnit(Type type, String name, Object value) {
+		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 
-		if (type instanceof PrimType) {
-			PrimType primType = (PrimType) type;
+		if (type instanceof PrimType || type == Scene.v().getType("java.lang.String")) {
+			Type primType = type;
 			Local primeLocal = localGenerator.generateFreshLocal(primType, name);
 			Value primeValue = value == null ? JimpleUtils.generateDummyValueForType(primType) : JimpleUtils.generateConstantValue(value);
 			Unit primeAssignStmt = assignGenerator.generateAssignStmt(primeLocal, primeValue);
 			List<Unit> primeUnits = Lists.newArrayList();
 			primeUnits.add(primeAssignStmt);
 			generatedUnits.put(primeLocal, primeUnits);
-			return generatedUnits;
 			
 		} else if (type instanceof ArrayType) {
 			ArrayType arrayType = (ArrayType) type;
-			//TODO: length and value of Array
-			Local arrayLocal = localGenerator.genereateFreshArrayLocal(arrayType.baseType, name, 16);
+			Local arrayLocal = localGenerator.genereateFreshArrayLocal(arrayType, name, 1);
 			Unit arrayAssign = assignGenerator.generateArrayAssignStmt(arrayLocal, 16);
 			List<Unit> arrayUnits = Lists.newArrayList();
 			arrayUnits.add(arrayAssign);
 			generatedUnits.put(arrayLocal, arrayUnits);
-			return generatedUnits;
+
 		} else if (type instanceof RefType) {
 			
 			RefType refType = (RefType) type;
-			SootClass clazz = refType.getSootClass();
-			SootMethod initMethod = JimpleUtils.getBestInitializationMethod(clazz);;
-			
-			// TODO: check if clazz is abstract or an interface, if yes find the beste subclass!
-			
-			// Check if a rule exist for the clazz (predicate)
-			
-//			if (clazz.isAbstract()) {
-//				clazz = JimpleUtils.getSubClass(clazz);
-//				initMethod = JimpleUtils.getBestInitializationMethod(clazz);
-//
-//			} else if (clazz.isInterface()) {
-//				clazz = JimpleUtils.getImplementedInterface(clazz);
-//				initMethod = JimpleUtils.getBestInitializationMethod(clazz);
-//			} else {
-//				initMethod = JimpleUtils.getBestInitializationMethod(clazz);
-//			}
-
-			List<Type> parameterTypes = initMethod.getParameterTypes();
-			HashMap<Local, List<Unit>> generatedRefTypeParameterUnits = Maps.newHashMap();
-			if (!Utils.isNullOrEmpty(parameterTypes)) {
-				for (Type parameterType : parameterTypes) {
-					generatedRefTypeParameterUnits.putAll(generateParameterUnit(parameterType, "" , JimpleUtils.generateDummyValueForType(parameterType)));
-				}
+			SootClass refTypeClazz = refType.getSootClass();
+			Entry<SootClass, SootMethod> init = JimpleUtils.getImplementingClassAndInitMethod(refTypeClazz);
+			SootClass initClazz  = init.getKey();
+			SootMethod initMethod = init.getValue();
+			Local initLocal = localGenerator.generateFreshLocal(initClazz.getType(), name);
+		
+			generatedUnits.put(initLocal, Lists.newArrayList());
+			Map<Local, List<Unit>> generatedParameterUnits = generateParameterUnits(initMethod, null , null);		
+			for(List<Unit> l : generatedParameterUnits.values()) {
+				generatedUnits.get(initLocal).addAll(l);	
 			}
-
-			Local refTypeLocal = localGenerator.generateFreshLocal(refType, name);
-			Local[] RefTypeParameterLocals = generatedRefTypeParameterUnits.keySet().toArray(new Local[0]);
-			generatedUnits.putAll(callGenerator.generateCallUnits(refTypeLocal, initMethod, RefTypeParameterLocals));			
+			
+			Local[] parameterLocals = generatedParameterUnits.keySet().toArray(new Local[0]);
+			Map<Local, List<Unit>> generatedCallUnits = callGenerator.generateCallUnits(initLocal, initMethod, parameterLocals);
+			for(List<Unit> l : generatedCallUnits.values()) {
+				generatedUnits.get(initLocal).addAll(l);	
+			}	
 		}
 		return generatedUnits;
 	}

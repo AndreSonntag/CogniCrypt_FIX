@@ -3,11 +3,12 @@ package de.upb.cognicryptfix.generator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
-import de.upb.cognicryptfix.crysl.CrySLEntityPool;
+import de.upb.cognicryptfix.crysl.pool.CrySLEntityPool;
 import de.upb.cognicryptfix.generator.jimple.JimpleArrayGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleCallGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleInvokeGenerator;
@@ -53,11 +54,11 @@ public class JimpleCodeGenerator {
 	
 
 	//currently it is here not possible to use the returned object :/
-	public HashMap<Local, List<Unit>> generateCall(Local var, SootMethod method, Local... parameterLocals){
+	public Map<Local, List<Unit>> generateCall(Local var, SootMethod method, Local... parameterLocals){
 		return callGenerator.generateCallUnits(var, method, parameterLocals);
 	}
 		
-	public HashMap<Local, List<Unit>> generateParametersForCall(SootMethod method, List<String> parameterNames, List<Object> parameterValues){
+	public Map<Local, List<Unit>> generateParametersForCall(SootMethod method, List<String> parameterNames, List<Object> parameterValues){
 		return parameterGenerator.generateParameterUnits(method, parameterNames, parameterValues);
 	}
 	
@@ -65,7 +66,7 @@ public class JimpleCodeGenerator {
 		trapGenerator.generateTraps(method, tryUnits);
 	}
 		
-	public HashMap<Local, List<Unit>> generateArray(Type type, List<Value> values){
+	public Map<Local, List<Unit>> generateArray(Type type, List<Value> values){
 		return arrayGenerator.generateArrayUnits(type, values);
 	}
 

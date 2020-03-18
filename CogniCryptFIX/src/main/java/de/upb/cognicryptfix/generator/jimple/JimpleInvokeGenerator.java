@@ -39,14 +39,17 @@ public class JimpleInvokeGenerator {
 		SootMethodRef ref = method.makeRef();
 		InvokeExpr invokeExpr = null;
 
+		
 		if (method.isStatic()) {
 			invokeExpr = Jimple.v().newStaticInvokeExpr(ref, Arrays.asList(args));
 		} else if (method.isConstructor()) {
 			invokeExpr = Jimple.v().newSpecialInvokeExpr(invokingVar, ref, Arrays.asList(args));
+		} else if (method.getDeclaringClass().isInterface()) {
+			invokeExpr = Jimple.v().newInterfaceInvokeExpr(invokingVar, ref, Arrays.asList(args));
 		} else {
 			invokeExpr = Jimple.v().newVirtualInvokeExpr(invokingVar, ref, Arrays.asList(args));
 		}
-		
+				
 		//TODO: dynamic invokes ??
 
 		InvokeStmt invoke = Jimple.v().newInvokeStmt(invokeExpr);

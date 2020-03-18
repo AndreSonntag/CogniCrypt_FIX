@@ -1,7 +1,7 @@
 package de.upb.cognicryptfix.generator.jimple;
 
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -26,29 +26,29 @@ public class JimpleCallGenerator {
 	 * K y = x.getKey();
 	 */
 
+	private Body body;
 	private JimpleLocalGenerator localGenerator;
 	private JimpleInvokeGenerator invokeGenerator;
 	private JimpleAssignGenerator assignGenerator;
 
 	public JimpleCallGenerator(Body body) {
+		this.body = body;
 		this.localGenerator = new JimpleLocalGenerator(body);
 		this.invokeGenerator = new JimpleInvokeGenerator();
 		this.assignGenerator = new JimpleAssignGenerator();
 	}
 
-	public HashMap<Local, List<Unit>> generateCallUnits(Local var, SootMethod method, Local... parameterLocals) {
+	public Map<Local, List<Unit>> generateCallUnits(Local var, SootMethod method, Local... parameterLocals) {
 		return generateCallUnits(var, null, method, parameterLocals);
 	}
 
-	public HashMap<Local, List<Unit>> generateCallUnits(Local var, Local returnVar, SootMethod method, Local... parameterLocals) {
-		HashMap<Local, List<Unit>> generatedUnits = Maps.newHashMap();
+	public Map<Local, List<Unit>> generateCallUnits(Local var, Local returnVar, SootMethod method, Local... parameterLocals) {
+		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 
-		if (var.getType() == method.getReturnType()) {
-			if (method.isConstructor()) {
-				generatedUnits.putAll(generateConstructorCallUnits(returnVar, method, parameterLocals));
-			} else { // i.e. getInstance()
-				generatedUnits.putAll(generateSelfInitializeMethodCallUnits(returnVar, method, parameterLocals));
-			}
+		if (method.isConstructor()) { //init call
+			generatedUnits.putAll(generateConstructorCallUnits(var, method, parameterLocals));
+		} else if (var.getType() == method.getReturnType()) {// i.e. getInstance()
+			generatedUnits.putAll(generateSelfInitializeMethodCallUnits(var, method, parameterLocals));
 		} else if (returnVar == null) {
 			generatedUnits.putAll(generateVoidMethodCallUnits(var, method, parameterLocals));
 		} else {
@@ -57,18 +57,18 @@ public class JimpleCallGenerator {
 		return generatedUnits;
 	}
 
-	public HashMap<Local, List<Unit>> generateVoidMethodCallUnits(Local var, SootMethod method,
+	public Map<Local, List<Unit>> generateVoidMethodCallUnits(Local var, SootMethod method,
 			Local... parameterLocals) {
-		HashMap<Local, List<Unit>> generatedUnits = Maps.newHashMap();
+		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 		List<Unit> units = Lists.newArrayList();
 		units.add(invokeGenerator.generateInvokeStmt(var, method, parameterLocals));
 		generatedUnits.put(var, units);
 		return generatedUnits;
 	}
 
-	public HashMap<Local, List<Unit>> generateMethodCallWithReturnUnits(Local var, Local returnVar, SootMethod method,
+	public Map<Local, List<Unit>> generateMethodCallWithReturnUnits(Local var, Local returnVar, SootMethod method,
 			Local... parameterLocals) {
-		HashMap<Local, List<Unit>> generatedUnits = Maps.newHashMap();
+		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 
 		InvokeStmt invoke = (InvokeStmt) invokeGenerator.generateInvokeStmt(var, method, parameterLocals);
 		Unit assign = assignGenerator.generateAssignStmt(returnVar, invoke.getInvokeExpr());
@@ -81,8 +81,8 @@ public class JimpleCallGenerator {
 	}
 
 	// REFATOR check necessary!!!!
-	public HashMap<Local, List<Unit>> generateSelfInitializeMethodCallUnits(Local var, SootMethod method, Local... parameterLocals) {
-		HashMap<Local, List<Unit>> generatedUnits = Maps.newHashMap();
+	public Map<Local, List<Unit>> generateSelfInitializeMethodCallUnits(Local var, SootMethod method, Local... parameterLocals) {
+		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 
 		InvokeStmt invoke = (InvokeStmt) invokeGenerator.generateInvokeStmt(var, method, parameterLocals);
 		Unit assign = assignGenerator.generateAssignStmt(var, invoke.getInvokeExpr());
@@ -94,11 +94,9 @@ public class JimpleCallGenerator {
 		return generatedUnits;
 	}
 
-	public HashMap<Local, List<Unit>> generateConstructorCallUnits(Local var, SootMethod method,
-			Local... parameterLocals) {
-		HashMap<Local, List<Unit>> generatedUnits = Maps.newHashMap();
+	public Map<Local, List<Unit>> generateConstructorCallUnits(Local var, SootMethod method, Local... parameterLocals) {
+		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 
-		if (method.isConstructor()) {
 			Local temp = localGenerator.generateFreshLocal(var.getType());
 			Unit typeAssign = assignGenerator.generateVariableTypeAssignStmt(temp);
 			Unit constructorInvoke = invokeGenerator.generateInvokeStmt(temp, method, parameterLocals);
@@ -109,9 +107,7 @@ public class JimpleCallGenerator {
 			units.add(constructorInvoke);
 			units.add(assign);
 			generatedUnits.put(var, units);
-		} else {
-			throw new RuntimeException("Method is not a constructor: " + method.getSignature());
-		}
+	
 		return generatedUnits;
 	}
 }

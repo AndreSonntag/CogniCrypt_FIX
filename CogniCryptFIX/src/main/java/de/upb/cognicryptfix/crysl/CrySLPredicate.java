@@ -2,15 +2,16 @@ package de.upb.cognicryptfix.crysl;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 import crypto.interfaces.ICrySLPredicateParameter;
 import crypto.rules.CrySLCondPredicate;
 import crypto.rules.CrySLObject;
 import crypto.rules.StateNode;
-import de.upb.cognicryptfix.crysl.fsm.call.CrySLPathFilter;
 import de.upb.cognicryptfix.utils.Utils;
 import soot.Scene;
 import soot.Type;
@@ -44,14 +45,12 @@ public class CrySLPredicate {
 					}
 				}
 		}
-		
 		return requiredPredicates;
 	}
-
+	
 	public LinkedList<CrySLMethodCall> getPath() {
 		if (generationPath.isEmpty()) {
 			List<LinkedList<CrySLMethodCall>> possiblePaths = calcPaths();
-			CrySLPathFilter.filterCallPathsByFewestRequiredPredicates(possiblePaths, producer);
 			generationPath = calcPaths().get(0);
 		}
 		return generationPath;
@@ -62,11 +61,11 @@ public class CrySLPredicate {
 			CrySLCondPredicate conPred = (CrySLCondPredicate) predicate_;
 			Set<StateNode> afterStates = conPred.getConditionalMethods();
 			List<LinkedList<CrySLMethodCall>> paths = producer.getFSM()
-					.calcShortesPathsForPredicateFromState(afterStates.iterator().next(), predicateParameters);
+					.calcBestPathsForPredicateGenerationFromState(afterStates.iterator().next(), predicateParameters);
 			return paths;
 		} else {
 			List<LinkedList<CrySLMethodCall>> paths = producer.getFSM()
-					.calcShortesPathsForPredicate(predicateParameters);
+					.calcBestPathsForPredicateGenerationFromFinalStates(predicateParameters);
 			return paths;
 		}
 	}
@@ -114,14 +113,5 @@ public class CrySLPredicate {
 		return builder.toString();
 	}
 
-	private void printPath(List<CrySLMethodCall> path) {
-
-		StringBuilder builder = new StringBuilder();
-		builder.append("****" + producer.getRule().getClassName() + " " + predicateName + predicateParameters + "\n");
-		for (CrySLMethodCall call : path) {
-			builder.append("- " + call.getSootMethod().getSignature() + "\n");
-		}
-
-		System.out.println(builder.toString());
-	}
+	
 }

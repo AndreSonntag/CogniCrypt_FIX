@@ -1,10 +1,15 @@
 package de.upb.cognicryptfix.generator.jimple;
 
+import java.util.AbstractMap.SimpleEntry;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
+import de.upb.cognicryptfix.Constants;
 import de.upb.cognicryptfix.utils.ByteConstant;
 import de.upb.cognicryptfix.utils.InitializationMethodSorter;
 import soot.Body;
@@ -13,6 +18,7 @@ import soot.ByteType;
 import soot.DoubleType;
 import soot.FastHierarchy;
 import soot.FloatType;
+import soot.Hierarchy;
 import soot.IntType;
 import soot.Local;
 import soot.LongType;
@@ -41,10 +47,12 @@ import soot.jimple.internal.JimpleLocalBox;
  */
 public class JimpleUtils {
 
-	private static FastHierarchy hierarchy = Scene.v().getOrMakeFastHierarchy();
+	public static FastHierarchy getFastHierarchy() {
+		return Scene.v().getOrMakeFastHierarchy();
+	}
 
-	public static FastHierarchy getHierarchy() {
-		return hierarchy;
+	public static Hierarchy getHierarchy() {
+		return Scene.v().getActiveHierarchy();
 	}
 
 	/**
@@ -105,16 +113,9 @@ public class JimpleUtils {
 	public static Constant generateDummyValueForType(Type type) {
 
 		Type objType = Scene.v().getType("java.lang.Object");
-		Type boolType = Scene.v().getType("java.lang.Boolean");
-		Type intType = Scene.v().getType("java.lang.Integer");
-		Type doubleType = Scene.v().getType("java.lang.Double");
-		Type longType = Scene.v().getType("java.lang.Long");
-		Type shortType = Scene.v().getType("java.lang.Short");
-		Type stringType = Scene.v().getType("java.lang.String");
 		Type charType = Scene.v().getType("java.lang.Character");
-		Type byteType = Scene.v().getType("java.lang.Byte");
 
-		if (type instanceof PrimType) {
+		if (type instanceof PrimType || type == Scene.v().getType("java.lang.String")) {
 
 			if (type == objType) {
 				return generateConstantValue(new Object());
@@ -140,29 +141,29 @@ public class JimpleUtils {
 		}
 		return null;
 	}
-	
+
 	public static Constant generateConstantValue(Type type, String object) {
-		if(type == Scene.v().getType("java.lang.String")) {
+		if (type == Scene.v().getType("java.lang.String")) {
 			return generateConstantValue(object);
-		}else if(type == Scene.v().getType("java.lang.String[]")) {
-				return generateConstantValue(object);
-		}else if (type == IntType.v()) {
+		} else if (type == Scene.v().getType("java.lang.String[]")) {
+			return generateConstantValue(object);
+		} else if (type == IntType.v()) {
 			return generateConstantValue(Integer.parseInt(object));
-		} else if(type == DoubleType.v()) {
+		} else if (type == DoubleType.v()) {
 			return generateConstantValue(Double.parseDouble(object));
-		} else if(type == LongType.v()) {
+		} else if (type == LongType.v()) {
 			return generateConstantValue(Long.parseLong(object));
-		} else if(type == ShortType.v()) {
+		} else if (type == ShortType.v()) {
 			return generateConstantValue(Short.parseShort(object));
-		} else if(type == FloatType.v()) {
+		} else if (type == FloatType.v()) {
 			return generateConstantValue(Float.parseFloat(object));
-		} else if(type == ByteType.v()) {
-			return generateConstantValue(Byte.parseByte(object));	
+		} else if (type == ByteType.v()) {
+			return generateConstantValue(Byte.parseByte(object));
 		} else {
 			throw new RuntimeException("unrecognized constant value = " + object);
 		}
 	}
-	
+
 	public static Constant generateConstantValue(Object object) {
 		if (object == null) {
 			return NullConstant.v();
@@ -197,55 +198,90 @@ public class JimpleUtils {
 		SootClass superClass = Scene.v().loadClassAndSupport(type.toQuotedString());
 		SootClass subClass = Scene.v().loadClassAndSupport(toCheck.toQuotedString());
 
-		if(type == toCheck) {
+		if (type == toCheck) {
 			return true;
-		} else if (hierarchy.getAllSubinterfaces(superClass).contains(subClass)
-				|| hierarchy.getSubclassesOf(superClass).contains(subClass)
-				|| hierarchy.getAllImplementersOfInterface(superClass).contains(subClass)) {
+		} else if (getFastHierarchy().getAllSubinterfaces(superClass).contains(subClass)
+				|| getFastHierarchy().getSubclassesOf(superClass).contains(subClass)
+				|| getFastHierarchy().getAllImplementersOfInterface(superClass).contains(subClass)) {
 			return true;
 		} else {
 			return false;
 		}
 	}
 
-	public static SootMethod getBestInitializationMethod(SootClass clazz) {
+	public static Entry<SootClass, SootMethod> getImplementingClassAndInitMethod(SootClass clazz) {
+
+		if (clazz.isConcrete()) {
+			SootMethod init = getBestInitializationMethod(clazz);
+			return new SimpleEntry(clazz, init);
+		} else if (clazz.isInterface() || clazz.isAbstract()) {
+			List<SootClass> clazzCandidates = getImplementedInterfaceOrAbstractClass(clazz);
+
+			if (!clazzCandidates.isEmpty()) {
+				Map<SootClass, SootMethod> classInitMethodMap = Maps.newHashMap();
+
+				for (SootClass clazzCandidate : clazzCandidates) {
+					SootMethod initMethod = getBestInitializationMethod(clazzCandidate);
+					if(initMethod != null) {
+						classInitMethodMap.put(clazzCandidate, initMethod);
+					}
+				}
+
+				List<SootMethod> initMethods = Lists.newArrayList(classInitMethodMap.values());
+				Collections.sort(initMethods, new InitializationMethodSorter());
+				SootClass winner = null;
+
+				for (SootClass clazzCandidate : classInitMethodMap.keySet()) {
+					if (classInitMethodMap.get(clazzCandidate) == initMethods.get(0)) {
+						winner = clazzCandidate;
+						break;
+					}
+				}
+				return new SimpleEntry(winner, classInitMethodMap.get(winner));
+			}
+			return null;
+		} else {
+			return null;
+		}
+	}
+
+	private static List<SootClass> getImplementedInterfaceOrAbstractClass(SootClass clazz) {
+		List<SootClass> concreteImplementatons = Lists.newArrayList();
+		List<SootClass> implementations = Lists.newArrayList(getFastHierarchy().getAllImplementersOfInterface(clazz));
+
+		for (SootClass implementation : implementations) {
+			if (implementation.isConcrete()) {
+				concreteImplementatons.add(implementation);
+			}
+		}
+		implementations = Lists.newArrayList(getFastHierarchy().getSubclassesOf(clazz));
+
+		for (SootClass implementation : implementations) {
+			if (implementation.isConcrete()) {
+				concreteImplementatons.add(implementation);
+			}
+		}
+		return concreteImplementatons;
+	}
+
+	private static SootMethod getBestInitializationMethod(SootClass clazz) {
+
 		List<SootMethod> initMethods = Lists.newArrayList();
 		for (SootMethod method : clazz.getMethods()) {
-			if (method.isConstructor() || method.getName().contains("getInstance")) {
-				initMethods.add(method);
+			if ((method.isConstructor() || method.getName().contains("getInstance")) && method.isPublic()) {
+				boolean useOfNotSupportedType = false;
+				for(Type parameterType : method.getParameterTypes()) {
+					if(Constants.notSupportedParameterTypes.contains(parameterType.toQuotedString())){
+						useOfNotSupportedType = true;
+					}
+				}
+				if(!useOfNotSupportedType) {
+					initMethods.add(method);
+				}
 			}
 		}
 		Collections.sort(initMethods, new InitializationMethodSorter());
-		return initMethods.get(0);
+		return initMethods.isEmpty() ? null : initMethods.get(0);
 	}
-
-//	// TODO: not good enough
-//	public static SootClass getImplementedInterface(SootClass clazz) {
-//		HashMap<SootMethod, SootClass> implementationMap = Maps.newHashMap();
-//
-//		List<SootClass> implementations = new ArrayList(hierarchy.getAllImplementersOfInterface(clazz));
-//		for (SootClass implementation : implementations) {
-//			implementationMap.put(getBestInitializationMethod(implementation), implementation);
-//		}
-//
-//		List<SootMethod> initMethods = Lists.newArrayList(implementationMap.keySet());
-//		Collections.sort(initMethods, new InitializationMethodSorter());
-//
-//		return implementationMap.get(initMethods);
-//	}
-//
-//	// TODO: not good enough
-//	public static SootClass getSubClass(SootClass clazz) {
-//		HashMap<SootMethod, SootClass> subclassMap = Maps.newHashMap();
-//		List<SootClass> subclasses = new ArrayList(hierarchy.getSubclassesOf(clazz));
-//		for (SootClass subclass : subclasses) {
-//			subclassMap.put(getBestInitializationMethod(subclass), subclass);
-//		}
-//
-//		List<SootMethod> initMethods = Lists.newArrayList(subclassMap.keySet());
-//		Collections.sort(initMethods, new InitializationMethodSorter());
-//
-//		return subclassMap.get(initMethods);
-//	}
 
 }
