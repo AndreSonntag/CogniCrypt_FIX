@@ -84,13 +84,9 @@ public class NeverTypeOfPatch extends AbstractPatch {
 	}
 
 	private void replaceStringType(Body body, Type usedType, Type expectedType) {
-//		Test purposes
-//		Type byteType = Scene.v().getType("byte[]");
-//		expectedType = byteType;
-		
+
 		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
-		AssignStmt wrapperAssignStmt = (AssignStmt) error.getCallSiteWithExtractedValue().getVal().stmt().getUnit()
-				.get();
+		AssignStmt wrapperAssignStmt = (AssignStmt) error.getCallSiteWithExtractedValue().getVal().stmt().getUnit().get();
 		InvokeExpr wrapperInvokeExpr = (InvokeExpr) wrapperAssignStmt.getRightOpBox().getValue();
 		Local stringLocal = (Local) wrapperInvokeExpr.getUseBoxes().get(0).getValue();
 
@@ -108,14 +104,15 @@ public class NeverTypeOfPatch extends AbstractPatch {
 			patchValue = arrayLocal.toString() + " -> " + arrayAssign.toString();
 			wrapperAssignStmt.getRightOpBox().setValue(arrayLocal);
 			body.getUnits().insertBefore(generatedUnits.get(arrayLocal), wrapperAssignStmt);
-//			System.out.println();
+
 		} else if (expectedType instanceof PrimType) {
+		
 		} else if (expectedType == Scene.v().getType("java.lang.String")) {
+		
 		}
 	}
 
-	private Map<Local, List<Unit>> generateUnitsForArrayType(List<Value> values, Type usedType,
-			ArrayType expectedArrayType) {
+	private Map<Local, List<Unit>> generateUnitsForArrayType(List<Value> values, Type usedType, ArrayType expectedArrayType) {
 		Map<Local, List<Unit>> generatedUnits = Maps.newHashMap();
 		Type stringType = Scene.v().getType("java.lang.String");
 		Value value = values.get(0);
