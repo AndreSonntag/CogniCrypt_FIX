@@ -7,6 +7,7 @@ import com.google.common.collect.Lists;
 
 import crypto.rules.CrySLMethod;
 import crypto.rules.CrySLRule;
+import de.upb.cognicryptfix.crysl.pool.CrySLVariablePool;
 import de.upb.cognicryptfix.utils.Utils;
 import soot.RefType;
 import soot.Scene;
@@ -23,7 +24,7 @@ public class CrySLMethodCall {
 	private CrySLRule rule;
 	private SootMethod sootMethod;
 	private CrySLMethod crySLMethod;
-	private CrySLVariableConstraintPool pool;
+	private CrySLVariablePool pool;
 	private List<CrySLVariable> callParameters;
 	private CrySLVariable callReturn;
 	private CrySLMethodCallCriteria callCriteria;
@@ -31,11 +32,11 @@ public class CrySLMethodCall {
 	private int requiredRefTypeGenerations;
 	private boolean initCall;
 
-	public CrySLMethodCall(CrySLRule rule, SootMethod sootMethod, CrySLMethod cryslMethod, boolean initCall, CrySLVariableConstraintPool pool) {
+	public CrySLMethodCall(CrySLRule rule, SootMethod sootMethod, CrySLMethod cryslMethod, CrySLVariablePool pool) {
 		this.rule = rule;
 		this.sootMethod = sootMethod;
 		this.crySLMethod = cryslMethod;
-		this.initCall = initCall;
+		this.initCall = isInitCall();
 		this.pool = pool;
 		this.callParameters = resolveCallParameters();	
 		this.callReturn = resolveCallReturn();
@@ -108,7 +109,7 @@ public class CrySLMethodCall {
 	}
 	
 	public boolean isInitCall() {
-		return initCall;
+		return sootMethod.isConstructor() || rule.getClassName().equals(sootMethod.getReturnType().toQuotedString()) ? true : false;
 	}
 	
 	public CrySLRule getRule() {

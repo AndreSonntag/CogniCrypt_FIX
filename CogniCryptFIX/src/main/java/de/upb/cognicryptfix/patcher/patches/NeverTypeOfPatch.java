@@ -3,6 +3,7 @@ package de.upb.cognicryptfix.patcher.patches;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -87,7 +88,7 @@ public class NeverTypeOfPatch extends AbstractPatch {
 //		Type byteType = Scene.v().getType("byte[]");
 //		expectedType = byteType;
 		
-		HashMap<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
+		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 		AssignStmt wrapperAssignStmt = (AssignStmt) error.getCallSiteWithExtractedValue().getVal().stmt().getUnit()
 				.get();
 		InvokeExpr wrapperInvokeExpr = (InvokeExpr) wrapperAssignStmt.getRightOpBox().getValue();
@@ -113,9 +114,9 @@ public class NeverTypeOfPatch extends AbstractPatch {
 		}
 	}
 
-	private HashMap<Local, List<Unit>> generateUnitsForArrayType(List<Value> values, Type usedType,
+	private Map<Local, List<Unit>> generateUnitsForArrayType(List<Value> values, Type usedType,
 			ArrayType expectedArrayType) {
-		HashMap<Local, List<Unit>> generatedUnits = Maps.newHashMap();
+		Map<Local, List<Unit>> generatedUnits = Maps.newHashMap();
 		Type stringType = Scene.v().getType("java.lang.String");
 		Value value = values.get(0);
 		List<Value> constants = Lists.newArrayList();

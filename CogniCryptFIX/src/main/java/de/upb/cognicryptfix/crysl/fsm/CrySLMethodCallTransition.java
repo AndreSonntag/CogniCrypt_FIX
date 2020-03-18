@@ -1,4 +1,4 @@
-package de.upb.cognicryptfix.crysl.fsm.call;
+package de.upb.cognicryptfix.crysl.fsm;
 
 import de.upb.cognicryptfix.crysl.CrySLMethodCall;
 

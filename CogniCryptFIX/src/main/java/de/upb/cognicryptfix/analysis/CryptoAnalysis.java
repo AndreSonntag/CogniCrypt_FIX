@@ -21,6 +21,7 @@ import soot.G;
 import soot.PackManager;
 import soot.Scene;
 import soot.SceneTransformer;
+import soot.SootClass;
 import soot.SootMethod;
 import soot.Transform;
 import soot.Unit;
@@ -91,7 +92,6 @@ public class CryptoAnalysis {
 	private void setSootOptions(final MavenProject project) {
 //		Options.v().set_src_prec(3);	//input JimpleFiles! 
 		Options.v().set_soot_classpath(getSootClasspath(project)+ File.pathSeparator + pathToJCE());
-
 		Options.v().set_process_dir(Lists.newArrayList(project.getBuildDirectory()));
 		
 		switch (DEFAULT_CALL_GRAPH.ordinal()) {
@@ -116,13 +116,14 @@ public class CryptoAnalysis {
 		Options.v().set_full_resolver(true);
 		loadAndSupportNotResolvedClasses();
 		Scene.v().loadNecessaryClasses();
+
 		logger.info("initializing soot");
 	}
 	
 	private void loadAndSupportNotResolvedClasses() {
-		for(CrySLRule rule : rules) {
+		for(CrySLRule rule : rules) {		
 			if(!Scene.v().containsClass(rule.getClassName())) {
-				Scene.v().loadClassAndSupport(rule.getClassName());
+				Scene.v().addBasicClass(rule.getClassName());
 			}
 		}
 	}
@@ -145,7 +146,7 @@ public class CryptoAnalysis {
 	private List<String> getExcludeList() {
 		final List<String> excludeList = new LinkedList<String>();
 		for (final CrySLRule r : rules) {
-			excludeList.add(crypto.Utils.getFullyQualifiedName(r));
+			excludeList.add(r.getClassName());
 		}
 		return excludeList;
 	}

@@ -107,7 +107,7 @@ public class JimpleTrapGenerator {
 		// remove subclasses of caught exceptions by "thrown"
 		for (SootClass throwsException : throwsExceptions) {
 			for (SootClass exception : new ArrayList<>(exceptions)) { // iterating over a copy
-				if (JimpleUtils.getHierarchy().isSubclass(exception, throwsException)) {
+				if (JimpleUtils.getFastHierarchy().isSubclass(exception, throwsException)) {
 					exceptions.remove(exception);
 				}
 			}
@@ -126,7 +126,7 @@ public class JimpleTrapGenerator {
 			SootClass trapCatchException = trap.getException();
 			if (trapTryUnits.containsAll(tryUnits)) {
 				for (SootClass exception : new ArrayList<>(exceptions)) {
-					if (exception.equals(trapCatchException) || JimpleUtils.getHierarchy().isSubclass(exception, trapCatchException)) {
+					if (exception.equals(trapCatchException) || JimpleUtils.getFastHierarchy().isSubclass(exception, trapCatchException)) {
 						exceptions.remove(exception);
 					}
 				}

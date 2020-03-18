@@ -14,7 +14,6 @@ import org.apache.logging.log4j.core.config.Configurator;
 import crypto.rules.CrySLRule;
 import de.upb.cognicryptfix.analysis.CryptoAnalysis;
 import de.upb.cognicryptfix.analysis.CryptoAnalysisListener;
-import de.upb.cognicryptfix.crysl.CrySLEntityPool;
 import de.upb.cognicryptfix.crysl.CrySLReaderUtils;
 import de.upb.cognicryptfix.utils.MavenProject;
 import de.upb.cognicryptfix.utils.Utils;
