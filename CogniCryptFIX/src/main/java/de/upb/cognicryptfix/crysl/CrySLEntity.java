@@ -7,29 +7,38 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 import crypto.rules.CrySLRule;
-import de.upb.cognicryptfix.crysl.fsm.call.CrySLCallFSM;
+import de.upb.cognicryptfix.crysl.fsm.CrySLCallFSM;
+import de.upb.cognicryptfix.crysl.pool.CrySLEntityPool;
+import de.upb.cognicryptfix.crysl.pool.CrySLVariablePool;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
-
+import soot.Scene;
+import soot.SootClass;
 
 public class CrySLEntity {
 
 	private CrySLRule rule;
 	private CrySLCallFSM fsm;
-	private CrySLVariableConstraintPool pool;
+	private CrySLVariablePool pool;
+	
 	private List<CrySLPredicate> ensuredPredicates;
 	private List<CrySLPredicate> requiredPredicates;
 	private Map<CrySLVariable, List<CrySLPredicate>> variableRequiredPredicateMap;
 	
+	private SootClass clazz;
+	private boolean interfaceOrAbstract;
+
 	public CrySLEntity(CrySLRule rule) {
+		this.clazz = Scene.v().getSootClass(rule.getClassName());
+		this.interfaceOrAbstract = clazz.isAbstract() || clazz.isInterface() ? true : false;
 		this.rule = rule;
-		this.pool = new CrySLVariableConstraintPool(rule);
-		this.fsm = new CrySLCallFSM(rule, pool);
+		this.pool = new CrySLVariablePool(rule);
+		this.fsm = new CrySLCallFSM(this, pool);
 		this.ensuredPredicates = Lists.newArrayList();
 		this.requiredPredicates = Lists.newArrayList();
 		this.variableRequiredPredicateMap = Maps.newHashMap();
 		generateEnsuredPredicates();
 	}
-
+	
 	private void generateEnsuredPredicates() {
 		for (crypto.rules.CrySLPredicate predicate : rule.getPredicates()) {
 			if (!predicate.isNegated()) {
@@ -57,16 +66,18 @@ public class CrySLEntity {
 			return true;
 		}
 	}
-
+	
 	public List<CrySLPredicate> getRequiredPredicateForVariable(CrySLVariable variable) {
+		//TODO improve by real hierrachy
+		
 		if (variableRequiredPredicateMap.get(variable) == null) {
 			return Lists.newArrayList();
 		} else {
 			List<CrySLPredicate> predicates = Lists.newArrayList(variableRequiredPredicateMap.get(variable));
-			for (CrySLPredicate predicate : predicates) {
+			for (CrySLPredicate predicate : Lists.newArrayList(predicates)) {
 				// TODO: really just the first parameter ?
 				CrySLVariable firstPredicateParameter = predicate.getPredicateParameters().get(0);
-				if (!JimpleUtils.isSubClassOrSubInterface(variable.getType(), firstPredicateParameter.getType())) {
+				if (!JimpleUtils.isEqualOrSubClassOrSubInterface(variable.getType(), firstPredicateParameter.getType())) {
 					predicates.remove(predicate);
 				}
 			}
@@ -92,6 +103,25 @@ public class CrySLEntity {
 
 	public List<crypto.rules.CrySLPredicate> getRequiredPredicates_() {
 		return rule.getRequiredPredicates();
+	}
+
+	public SootClass getSootClass() {
+		return clazz;
+	}
+	
+	public boolean isInterfaceOrAbstract() {
+		return interfaceOrAbstract;
+	}
+	
+	public List<CrySLPredicate> canProducedByPredicates(){
+		List<CrySLPredicate> producerPredicates= Lists.newArrayList();
+		if(isInterfaceOrAbstract()) {
+			List<CrySLPredicate> predicates = CrySLEntityPool.getInstance().getPossiblePredicateCandidatesForType(clazz.getType());
+			if (!predicates.isEmpty()) {
+				producerPredicates = predicates;
+			}
+		}
+		return producerPredicates;
 	}
 
 	@Override
