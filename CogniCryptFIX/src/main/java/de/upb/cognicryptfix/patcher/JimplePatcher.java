@@ -21,7 +21,7 @@ import crypto.rules.CrySLComparisonConstraint;
 import crypto.rules.CrySLPredicate;
 import crypto.rules.CrySLValueConstraint;
 import de.upb.cognicryptfix.analysis.CryptoAnalysisListener;
-import de.upb.cognicryptfix.crysl.CrySLEntityPool;
+import de.upb.cognicryptfix.crysl.pool.CrySLEntityPool;
 import de.upb.cognicryptfix.extractor.CrySLComparsionConstraintExtractor;
 import de.upb.cognicryptfix.extractor.CrySLPredicateExtractor;
 import de.upb.cognicryptfix.extractor.CrySLValueConstraintExtractor;
