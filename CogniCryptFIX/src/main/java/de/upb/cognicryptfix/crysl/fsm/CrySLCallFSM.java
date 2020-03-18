@@ -1,4 +1,4 @@
-package de.upb.cognicryptfix.crysl.fsm.call;
+package de.upb.cognicryptfix.crysl.fsm;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -18,10 +18,11 @@ import crypto.rules.StateMachineGraph;
 import crypto.rules.StateNode;
 import crypto.rules.TransitionEdge;
 import crypto.typestate.CrySLMethodToSootMethod;
+import de.upb.cognicryptfix.crysl.CrySLEntity;
 import de.upb.cognicryptfix.crysl.CrySLMethodCall;
 import de.upb.cognicryptfix.crysl.CrySLMethodCallCriteria;
 import de.upb.cognicryptfix.crysl.CrySLVariable;
-import de.upb.cognicryptfix.crysl.CrySLVariableConstraintPool;
+import de.upb.cognicryptfix.crysl.pool.CrySLVariablePool;
 import de.upb.cognicryptfix.utils.Pair;
 import soot.SootMethod;
 
@@ -32,8 +33,9 @@ import soot.SootMethod;
  */
 public class CrySLCallFSM {
 
+	private CrySLEntity entity;
 	private CrySLRule rule;
-	private CrySLVariableConstraintPool pool;
+	private CrySLVariablePool varPool;
 	private StateMachineGraph smg;
 	private CrySLMethodCallState startState;
 	private Set<CrySLMethodCallState> finalStates;
@@ -43,9 +45,10 @@ public class CrySLCallFSM {
 	private HashMap<StateNode, CrySLMethodCallState> wrapperStateMap;
 	private HashMap<SootMethod, Pair<CrySLMethodCallState, CrySLMethodCallState>> methodFromToStateMap;
 
-	public CrySLCallFSM(CrySLRule rule, CrySLVariableConstraintPool pool) {
-		this.rule = rule;
-		this.pool = pool;
+	public CrySLCallFSM(CrySLEntity entity, CrySLVariablePool pool) {
+		this.entity = entity;
+		this.rule = entity.getRule();
+		this.varPool = pool;
 		this.smg = rule.getUsagePattern();
 		this.wrapperStateMap = Maps.newLinkedHashMap();
 		this.methodFromToStateMap = Maps.newHashMap();
@@ -76,37 +79,31 @@ public class CrySLCallFSM {
 			}
 		}
 
+		if(rule.getClassName().equals("java.security.Key")) {
+			System.out.println();
+		}
+		
 		for (TransitionEdge edge : edges_) {
-			List<CrySLMethodCall> calls = createCrySLMethodCall(edge, smg.getInitialTransition() == edge ? true : false);
+			List<CrySLMethodCall> calls = createCrySLMethodCall(edge);
 			for (CrySLMethodCall call : calls) {
+				
 				CrySLMethodCallState from = wrapperStateMap.get(edge.getLeft());
 				CrySLMethodCallState to = wrapperStateMap.get(edge.getRight());
 
-				if (from.getState() != to.getState()) {
+				//to avoid state loops; if the state
+				if (from.getState() != to.getState()) {//|| (from.isInitState() && to.isFinalState())) {
 					CrySLMethodCallTransition transition = new CrySLMethodCallTransition(call, from, to);
 
 					transitions.add(transition);
 					from.addOutTransition(transition);
 					to.addInTransition(transition);
-					methodFromToStateMap.put(call.getSootMethod(),
-							new Pair<CrySLMethodCallState, CrySLMethodCallState>(from, to));
+					methodFromToStateMap.put(call.getSootMethod(), new Pair<CrySLMethodCallState, CrySLMethodCallState>(from, to));
 				}
 			}
 		}
 	}
 	
-	private List<CrySLMethodCall> createCrySLMethodCall(TransitionEdge edge, boolean initCall) {
-		List<CrySLMethodCall> calls = Lists.newArrayList();
-		for (CrySLMethod crySLMethod : edge.getLabel()) {
-			List<SootMethod> sootMethods = Lists.newArrayList(CrySLMethodToSootMethod.v().convert(crySLMethod));
-			if (!sootMethods.isEmpty()) {
-				calls.add(new CrySLMethodCall(rule, sootMethods.get(0), crySLMethod, initCall, pool));
-			}
-		}
-		return calls;
-	}
-
-	public List<LinkedList<CrySLMethodCall>> calcShortesPathsForPredicateFromState(StateNode state, List<CrySLVariable> predicatePramameters) {
+	public List<LinkedList<CrySLMethodCall>> calcBestPathsForPredicateGenerationFromState(StateNode state, List<CrySLVariable> predicatePramameters) {
 		List<LinkedList<CrySLMethodCall>> calcBackwardPaths = Lists.newArrayList();
 		List<LinkedList<CrySLMethodCall>> calcForwardPaths = Lists.newArrayList();
 		List<LinkedList<CrySLMethodCall>> paths = Lists.newArrayList();
@@ -132,14 +129,11 @@ public class CrySLCallFSM {
 		}
 		
 		paths = CrySLPathFilter.filterCallPathsByUsedPredicateParameters(paths, predicatePramameters);
-		paths = CrySLPathFilter.filterCallPathsByFewestUserInteractions(paths);
-		paths = CrySLPathFilter.filterCallPathsByFewestRefTypeGeneration(paths);
-		paths = CrySLPathFilter.filterCallPathsByFewestCalls(paths);
-		
+		paths = CrySLPathFilter.applyCriteriaFilters(paths);
 		return paths;
 	}
 
-	public List<LinkedList<CrySLMethodCall>> calcShortesPathsForPredicate(List<CrySLVariable> predicatePramameters) {
+	public List<LinkedList<CrySLMethodCall>> calcBestPathsForPredicateGenerationFromFinalStates(List<CrySLVariable> predicatePramameters) {
 		List<LinkedList<CrySLMethodCall>> calcBackwardPaths = Lists.newArrayList();
 
 		for (CrySLMethodCallState finalState : finalStates) {
@@ -150,13 +144,18 @@ public class CrySLCallFSM {
 		}
 		
 		calcBackwardPaths = CrySLPathFilter.filterCallPathsByUsedPredicateParameters(calcBackwardPaths, predicatePramameters);
-		calcBackwardPaths = CrySLPathFilter.filterCallPathsByFewestUserInteractions(calcBackwardPaths);
-		calcBackwardPaths = CrySLPathFilter.filterCallPathsByFewestRefTypeGeneration(calcBackwardPaths);
-		calcBackwardPaths = CrySLPathFilter.filterCallPathsByFewestCalls(calcBackwardPaths);
-
+		calcBackwardPaths = CrySLPathFilter.applyCriteriaFilters(calcBackwardPaths);
 		return calcBackwardPaths;
 	}
 
+	public List<LinkedList<CrySLMethodCall>> calcBestPathsToFinalStatesFromNextMethodState(SootMethod method) {
+		List<LinkedList<CrySLMethodCall>> calcForwardPaths = Lists.newArrayList();
+		calcForwardPaths = calcPathsForward(methodFromToStateMap.get(method).getLeft());
+		calcForwardPaths = CrySLPathFilter.applyCriteriaFilters(calcForwardPaths);
+		return calcForwardPaths;
+	}
+	
+	
 	private ArrayList<LinkedList<CrySLMethodCall>> calcPathsBackward(CrySLMethodCallState state,
 			List<CrySLMethodCallState> visitedStates) {
 		visitedStates.add(state);
@@ -224,55 +223,16 @@ public class CrySLCallFSM {
 		return calcPaths;
 	}
 
-
-	
-	@Deprecated
-	public ArrayList<LinkedList<CrySLMethodCall>> calcFewestUserInteractionRefTypeGenPathsFromStart() {
-		return calcFewestUserInteractionRefTypeGenPathsForward(startState);
-	}
-	
-	@Deprecated
-	public ArrayList<LinkedList<CrySLMethodCall>> calcFewestUserInteractionRefTypeGenPathsFrom(SootMethod method) {		
-		return calcFewestUserInteractionRefTypeGenPathsForward(methodFromToStateMap.get(method).getRight());
-	}
-	
-	@Deprecated
-	public ArrayList<LinkedList<CrySLMethodCall>> calcFewestUserInteractionRefTypeGenPathsFrom_(SootMethod method) {
-		return calcFewestUserInteractionRefTypeGenPathsForward(methodFromToStateMap.get(method).getLeft());
-	}
-
-	@Deprecated
-	private ArrayList<LinkedList<CrySLMethodCall>> calcFewestUserInteractionRefTypeGenPathsForward(
-			CrySLMethodCallState state) {
-		ArrayList<LinkedList<CrySLMethodCall>> calcPaths = Lists.newArrayList();
-		Map<CrySLMethodCallCriteria, List<CrySLMethodCallTransition>> transitionMap = state.getOutTransitions();
-
-		CrySLPathFilter.filterTransitionsByFewestMethodCallUserInteractions(transitionMap);
-		CrySLPathFilter.filterTransitionsByFewestRefTypeGenerations(transitionMap);
-
-		List<CrySLMethodCallTransition> filteredTransitionList = transitionMap.values().iterator().next();
-		LinkedList<CrySLMethodCall> path;
-
-		for (CrySLMethodCallTransition t : filteredTransitionList) {
-
-			if (t.to().isFinalState() || state == t.to()) {
-				path = Lists.newLinkedList();
-				path.add(t.getCall());
-				calcPaths.add(path);
-				return calcPaths;
-			}
-
-			ArrayList<LinkedList<CrySLMethodCall>> subPath = calcFewestUserInteractionRefTypeGenPathsForward(t.to());
-			for (LinkedList<CrySLMethodCall> t1 : subPath) {
-				path = Lists.newLinkedList();
-				path.add(t.getCall());
-				path.addAll(t1);
-				calcPaths.add(path);
+	private List<CrySLMethodCall> createCrySLMethodCall(TransitionEdge edge) {
+		List<CrySLMethodCall> calls = Lists.newArrayList();
+		for (CrySLMethod crySLMethod : edge.getLabel()) {
+			List<SootMethod> sootMethods = Lists.newArrayList(CrySLMethodToSootMethod.v().convert(crySLMethod));
+			if (!sootMethods.isEmpty()) {
+				calls.add(new CrySLMethodCall(rule, sootMethods.get(0), crySLMethod, varPool));
 			}
 		}
-		return calcPaths;
+		return calls;
 	}
-
 	
 	public CrySLMethodCall getCrySLMethodCallBySootMethod(SootMethod method) {
 		List<CrySLMethodCall> calls = Lists.newArrayList();
