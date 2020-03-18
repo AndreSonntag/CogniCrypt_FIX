@@ -1,4 +1,4 @@
-package de.upb.cognicryptfix.crysl;
+package de.upb.cognicryptfix.crysl.pool;
 
 import java.util.List;
 import java.util.Map;
@@ -16,6 +16,7 @@ import crypto.rules.CrySLConstraint;
 import crypto.rules.CrySLObject;
 import crypto.rules.CrySLRule;
 import crypto.rules.CrySLValueConstraint;
+import de.upb.cognicryptfix.crysl.CrySLVariable;
 import de.upb.cognicryptfix.extractor.constraints.ArithmeticConstraint;
 import de.upb.cognicryptfix.extractor.constraints.ComparisonConstraint;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
@@ -25,22 +26,22 @@ import soot.Scene;
 import soot.Value;
 import soot.jimple.NullConstant;
 
-public class CrySLVariableConstraintPool {
+public class CrySLVariablePool {
 
 	private CrySLRule rule;
 	private List<CrySLVariable> variables;
 	private List<ISLConstraint> constraints;
 	private Map<String, CrySLVariable> nameVariableMap;
 	private Map<CrySLVariable, List<ISLConstraint>> variableISLConstraintMap;
-	private Map<CrySLVariable, ISLConstraint> variableActiveConstraintMapping;	//TODO refactor
+	private Map<CrySLVariable, ISLConstraint> variableActiveConstraintMap;	
 
-	public CrySLVariableConstraintPool(CrySLRule rule) {
+	public CrySLVariablePool(CrySLRule rule) {
 		this.rule = rule;
 		this.variables = Lists.newArrayList();
 		this.constraints = rule.getConstraints();
 		this.nameVariableMap = Maps.newHashMap();
 		this.variableISLConstraintMap = Maps.newHashMap();
-		this.variableActiveConstraintMapping = Maps.newHashMap();
+		this.variableActiveConstraintMap = Maps.newHashMap();
 		init();
 	}
 
@@ -50,7 +51,7 @@ public class CrySLVariableConstraintPool {
 			variables.add(variable);
 			nameVariableMap.put(variable.getVariable(), variable);
 			variableISLConstraintMap.put(variable, Lists.newArrayList());
-			variableActiveConstraintMapping.put(variable, null);
+			variableActiveConstraintMap.put(variable, null);
 		}
 
 		CrySLVariable initVar = new CrySLVariable(Utils.getAppropriateVarName(rule),
@@ -58,19 +59,19 @@ public class CrySLVariableConstraintPool {
 		variables.add(initVar);
 		nameVariableMap.put(initVar.getVariable(), initVar);
 		variableISLConstraintMap.put(initVar, Lists.newArrayList());
-		variableActiveConstraintMapping.put(initVar, null);
+		variableActiveConstraintMap.put(initVar, null);
 
 		CrySLVariable voidReturnVar = new CrySLVariable("void", NullConstant.v().getType());
 		variables.add(voidReturnVar);
 		nameVariableMap.put(voidReturnVar.getVariable(), voidReturnVar);
 		variableISLConstraintMap.put(voidReturnVar, Lists.newArrayList());
-		variableActiveConstraintMapping.put(voidReturnVar, null);
+		variableActiveConstraintMap.put(voidReturnVar, null);
 
 		CrySLVariable substitutedVar = new CrySLVariable("_", Utils.getType(rule, "_"));
 		variables.add(substitutedVar);
 		nameVariableMap.put(substitutedVar.getVariable(), substitutedVar);
 		variableISLConstraintMap.put(substitutedVar, Lists.newArrayList());
-		variableActiveConstraintMapping.put(substitutedVar, null);
+		variableActiveConstraintMap.put(substitutedVar, null);
 
 		computeVariableConstraintMapping();
 		setValues();
@@ -85,8 +86,8 @@ public class CrySLVariableConstraintPool {
 			if (constraint instanceof CrySLValueConstraint) {
 				CrySLValueConstraint valCon = (CrySLValueConstraint) constraint;
 
-				if (variableActiveConstraintMapping.get(getVariableByName(valCon.getVarName())) == null) {
-					variableActiveConstraintMapping.put(getVariableByName(valCon.getVarName()), valCon);
+				if (variableActiveConstraintMap.get(getVariableByName(valCon.getVarName())) == null) {
+					variableActiveConstraintMap.put(getVariableByName(valCon.getVarName()), valCon);
 				}
 
 			} else if (constraint instanceof CrySLComparisonConstraint) {
@@ -103,8 +104,8 @@ public class CrySLVariableConstraintPool {
 					if (!StringUtils.isNumeric(leftLeft.getVarName()) && StringUtils.isNumeric(leftRight.getVarName())
 							&& StringUtils.isNumeric(rightLeft.getVarName())) {
 
-						if (variableActiveConstraintMapping.get(getVariableByName(leftLeft.getVarName())) == null) {
-							variableActiveConstraintMapping.put(getVariableByName(leftLeft.getVarName()), compCon);
+						if (variableActiveConstraintMap.get(getVariableByName(leftLeft.getVarName())) == null) {
+							variableActiveConstraintMap.put(getVariableByName(leftLeft.getVarName()), compCon);
 						}
 
 					}
@@ -127,24 +128,24 @@ public class CrySLVariableConstraintPool {
 						} else if (variableSetByImpliesCrySLConstraint.contains(leftVariable)) {
 
 						} else if (variableSetByImpliesCrySLConstraint.contains(rightVariable)) {
-							if (variableActiveConstraintMapping
+							if (variableActiveConstraintMap
 									.get(getVariableByName(leftValueCon.getVarName())) == null) {
-								variableActiveConstraintMapping.put(getVariableByName(leftValueCon.getVarName()),
+								variableActiveConstraintMap.put(getVariableByName(leftValueCon.getVarName()),
 										leftValueCon);
 							}
 						} else {
 							variableSetByImpliesCrySLConstraint.add(leftVariable);
 							variableSetByImpliesCrySLConstraint.add(rightVariable);
-							variableActiveConstraintMapping.put(getVariableByName(leftValueCon.getVarName()),
+							variableActiveConstraintMap.put(getVariableByName(leftValueCon.getVarName()),
 									leftValueCon);
-							variableActiveConstraintMapping.put(getVariableByName(rightValueCon.getVarName()),
+							variableActiveConstraintMap.put(getVariableByName(rightValueCon.getVarName()),
 									rightValueCon);
 						}
 					} else {
 						if (!variableSetByImpliesCrySLConstraint.contains(leftVariable)) {
-							if (variableActiveConstraintMapping
+							if (variableActiveConstraintMap
 									.get(getVariableByName(leftValueCon.getVarName())) == null) {
-								variableActiveConstraintMapping.put(getVariableByName(leftValueCon.getVarName()),
+								variableActiveConstraintMap.put(getVariableByName(leftValueCon.getVarName()),
 										leftValueCon);
 							}
 						}
@@ -156,8 +157,8 @@ public class CrySLVariableConstraintPool {
 					CrySLVariable leftVariable = getVariableByName(leftValueCon.getVarName());
 
 					if (!variableSetByImpliesCrySLConstraint.contains(leftVariable)) {
-						if (variableActiveConstraintMapping.get(leftVariable) == null) {
-							variableActiveConstraintMapping.put(leftVariable, leftValueCon);
+						if (variableActiveConstraintMap.get(leftVariable) == null) {
+							variableActiveConstraintMap.put(leftVariable, leftValueCon);
 						}
 					}
 				}
@@ -167,11 +168,11 @@ public class CrySLVariableConstraintPool {
 
 	private void setValues() {
 
-		for (CrySLVariable variable : variableActiveConstraintMapping.keySet()) {
-			if (variableActiveConstraintMapping.get(variable) == null) {
+		for (CrySLVariable variable : variableActiveConstraintMap.keySet()) {
+			if (variableActiveConstraintMap.get(variable) == null) {
 				continue;
 			}
-			ISLConstraint activeConstraint = variableActiveConstraintMapping.get(variable);
+			ISLConstraint activeConstraint = variableActiveConstraintMap.get(variable);
 
 			if (activeConstraint instanceof CrySLComparisonConstraint) {
 				CrySLComparisonConstraint compCon = (CrySLComparisonConstraint) activeConstraint;
@@ -228,7 +229,7 @@ public class CrySLVariableConstraintPool {
 	}
 
 	public ISLConstraint getVariableConstraint(CrySLVariable variable) {
-		return variableActiveConstraintMapping.get(variable);
+		return variableActiveConstraintMap.get(variable);
 	}
 
 	public List<CrySLVariable> getVariables() {
