@@ -4,11 +4,13 @@ import java.io.File;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 import boomerang.callgraph.ObservableDynamicICFG;
 import boomerang.callgraph.ObservableICFG;
@@ -16,16 +18,20 @@ import boomerang.preanalysis.BoomerangPretransformer;
 import crypto.analysis.CrySLAnalysisListener;
 import crypto.analysis.CryptoScanner;
 import crypto.rules.CrySLRule;
+import de.upb.cognicryptfix.Constants;
 import de.upb.cognicryptfix.utils.MavenProject;
+import soot.EntryPoints;
 import soot.G;
 import soot.PackManager;
 import soot.Scene;
 import soot.SceneTransformer;
 import soot.SootClass;
 import soot.SootMethod;
+import soot.SootResolver;
 import soot.Transform;
 import soot.Unit;
 import soot.options.Options;
+import soot.util.Chain;
 
 /**
  * @author Andre Sonntag
@@ -90,10 +96,7 @@ public class CryptoAnalysis {
 	}
 
 	private void setSootOptions(final MavenProject project) {
-//		Options.v().set_src_prec(3);	//input JimpleFiles! 
-		Options.v().set_soot_classpath(getSootClasspath(project)+ File.pathSeparator + pathToJCE());
-		Options.v().set_process_dir(Lists.newArrayList(project.getBuildDirectory()));
-		
+		G.v().reset();
 		switch (DEFAULT_CALL_GRAPH.ordinal()) {
 		case 2:
 			Options.v().setPhaseOption("cg.spark", "on");
@@ -105,27 +108,28 @@ public class CryptoAnalysis {
 			Options.v().setPhaseOption("cg", "all-reachable:true");
 		}
 		Options.v().setPhaseOption("jb", "use-original-names:true");
-		Options.v().set_keep_line_number(true);
-		Options.v().set_prepend_classpath(true);
 		Options.v().set_output_format(Options.output_format_none);
+		Options.v().set_no_bodies_for_excluded(true);
 		Options.v().set_allow_phantom_refs(true);
 		Options.v().set_whole_program(true);
-		Options.v().set_no_bodies_for_excluded(true);
+		Options.v().set_keep_line_number(true);
+		Options.v().set_prepend_classpath(true);
+		Options.v().set_soot_classpath(getSootClasspath(project)+ File.pathSeparator + pathToJCE() + File.pathSeparator+ pathToJCAJar());
+		Options.v().set_process_dir(Lists.newArrayList(project.getBuildDirectory(),pathToJCAJar()));
 		Options.v().set_include(getIncludeList());
 		Options.v().set_exclude(getExcludeList());
 		Options.v().set_full_resolver(true);
-		loadAndSupportNotResolvedClasses();
+		addUnsolvedClasses();
 		Scene.v().loadNecessaryClasses();
-
+		Scene.v().setEntryPoints(getEntryPoints());
 		logger.info("initializing soot");
 	}
-	
-	private void loadAndSupportNotResolvedClasses() {
-		for(CrySLRule rule : rules) {		
-			if(!Scene.v().containsClass(rule.getClassName())) {
-				Scene.v().addBasicClass(rule.getClassName());
-			}
-		}
+
+	private List<SootMethod> getEntryPoints() {
+		List<SootMethod> entryPoints = Lists.newArrayList();
+		entryPoints.addAll(EntryPoints.v().application());
+		entryPoints.addAll(EntryPoints.v().methodsOfApplicationClasses());
+		return entryPoints;
 	}
 	
 	private List<String> getIncludeList() {
@@ -145,10 +149,54 @@ public class CryptoAnalysis {
 	
 	private List<String> getExcludeList() {
 		final List<String> excludeList = new LinkedList<String>();
+		int i = 0;
 		for (final CrySLRule r : rules) {
 			excludeList.add(r.getClassName());
 		}
 		return excludeList;
+	}
+	
+	private void addUnsolvedClasses() {
+		List<String> unsolvedClasses = findUnsolvedClasses(false);
+		for(String s : unsolvedClasses) {
+			Scene.v().forceResolve(s, SootClass.SIGNATURES);
+		}
+	}
+	
+	private List<String> findUnsolvedClasses(boolean print) {
+		Chain<SootClass> resolvedClasses = Scene.v().getClasses();
+		Set<String> resolvedClassNames = Sets.newHashSet();
+		for(SootClass clazz : resolvedClasses) {
+			resolvedClassNames.add(clazz.getName());
+			if(clazz.getPackageName().contains("de.upb")) {
+				System.out.println(clazz.getName());
+			}
+		}
+		
+		List<String> unsolved = Lists.newArrayList();
+		List<String> solved = Lists.newArrayList();
+		for (final CrySLRule r : rules) {
+			if(!resolvedClassNames.contains(r.getClassName())) {
+				unsolved.add(r.getClassName());
+			} else {
+				solved.add(r.getClassName());
+			}
+		}
+		
+		if(print) {
+			int i = 0;
+			for (String us : unsolved) {
+				System.out.println(i + ". " + us + " couldn't solved.");
+				i++;
+			}
+			System.out.println("---------------------------------------");
+			int j = 0;
+			for (String s : solved) {
+				System.out.println(j + ". " + s + " solved.");
+				j++;
+			}
+		}
+		return unsolved;
 	}
 
 	private void registerTransformers(final CrySLAnalysisListener listener) {
@@ -157,11 +205,20 @@ public class CryptoAnalysis {
 	
 	private String getSootClasspath(final MavenProject project) {
 		String sootClasspath = project.getBuildDirectory()+(project.getFullClassPath().equals("") ? "": File.pathSeparator+ project.getFullClassPath());
+		System.out.println(sootClasspath);
 		return sootClasspath;
 	}
 	
 	private String pathToJCE() {
 		// When whole program mode is disabled, the classpath misses jce.jar
 		return System.getProperty("java.home") + File.separator + "lib" + File.separator + "jce.jar";
+	}
+	
+	private String pathToJCAJar() {
+		return new File(CryptoAnalysis.class.getResource("/JCAJar/JCARulesetImporter-0.0.1.jar").getPath()).getAbsolutePath();
+	}
+	
+	public static CryptoScanner getCryptoScanner() {
+		return staticScanner;
 	}
 }
