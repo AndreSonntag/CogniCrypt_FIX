@@ -1,42 +1,29 @@
 package de.upb.cognicryptfix.patcher;
 
 
-import java.util.Collection;
-import java.util.HashSet;
+import javax.activation.UnsupportedDataTypeException;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import boomerang.jimple.Statement;
-import crypto.analysis.AnalysisSeedWithSpecification;
-import crypto.analysis.CrySLResultsReporter;
 import crypto.analysis.errors.AbstractError;
 import crypto.analysis.errors.ConstraintError;
 import crypto.analysis.errors.ForbiddenMethodError;
 import crypto.analysis.errors.IncompleteOperationError;
 import crypto.analysis.errors.NeverTypeOfError;
-import crypto.constraints.ConstraintSolver;
-import crypto.interfaces.ISLConstraint;
-import crypto.rules.CrySLComparisonConstraint;
+import crypto.analysis.errors.RequiredPredicateError;
+import crypto.analysis.errors.TypestateError;
 import crypto.rules.CrySLPredicate;
-import crypto.rules.CrySLValueConstraint;
-import de.upb.cognicryptfix.analysis.CryptoAnalysisListener;
-import de.upb.cognicryptfix.crysl.pool.CrySLEntityPool;
-import de.upb.cognicryptfix.extractor.CrySLComparsionConstraintExtractor;
-import de.upb.cognicryptfix.extractor.CrySLPredicateExtractor;
-import de.upb.cognicryptfix.extractor.CrySLValueConstraintExtractor;
-import de.upb.cognicryptfix.extractor.constraints.ComparisonConstraint;
-import de.upb.cognicryptfix.extractor.constraints.PredicateConstraint;
-import de.upb.cognicryptfix.extractor.constraints.ValueConstraint;
+import de.upb.cognicryptfix.exception.NotExpectedUnitException;
+import de.upb.cognicryptfix.exception.NotSupportedConstraintException;
+import de.upb.cognicryptfix.patcher.patches.ConstraintPatch;
 import de.upb.cognicryptfix.patcher.patches.ForbiddenMethodPatch;
 import de.upb.cognicryptfix.patcher.patches.IncompleteOperationPatch;
 import de.upb.cognicryptfix.patcher.patches.NeverTypeOfPatch;
-import de.upb.cognicryptfix.patcher.patches.PrimitiveConstraintPatch;
-import de.upb.cognicryptfix.utils.Utils;
+import de.upb.cognicryptfix.patcher.patches.RequiredPredicatePatch;
+import de.upb.cognicryptfix.patcher.patches.TypeStatePatch;
 import soot.Body;
-import soot.Scene;
 import soot.SootClass;
-import soot.util.Chain;
 
 /**
  * @author Andre Sonntag
@@ -45,102 +32,132 @@ import soot.util.Chain;
 public class JimplePatcher implements IPatcher{
 
 	private static final Logger logger = LogManager.getLogger(JimplePatcher.class.getSimpleName());
-	private static int counter = 0;
 	
 	public SootClass getPatchedClass(AbstractError error) {
 		SootClass errorClass = error.getErrorLocation().getMethod().getDeclaringClass();
-		error.getErrorLocation().getMethod().setActiveBody(createPatch(error));
+		try {
+			error.getErrorLocation().getMethod().setActiveBody(createPatch(error));
+		} catch (NotSupportedConstraintException | NotExpectedUnitException | UnsupportedDataTypeException e) {
+			e.printStackTrace();
+		}
 		return errorClass;
-	}
+	}	
 	
-	private Body createPatch(AbstractError error) {
+	private Body createPatch(AbstractError error) throws NotSupportedConstraintException, NotExpectedUnitException, UnsupportedDataTypeException {
+		
+		printErrorInformation(error);
 		Body patchedJimpleBody = error.getErrorLocation().getMethod().getActiveBody();
-	
-		if(error instanceof IncompleteOperationError) {
-			IncompleteOperationError incompleteError = (IncompleteOperationError) error;
-			logger.info("Create patch for "+incompleteError.getClass().getSimpleName());
-			IncompleteOperationPatch patch = new IncompleteOperationPatch(incompleteError);
-			patch.getPatch();
+		
+		if (error instanceof ConstraintError && !(((ConstraintError) error).getBrokenConstraint() instanceof CrySLPredicate)) {
+			ConstraintError conError = (ConstraintError) error;			
+			ConstraintPatch patch = new ConstraintPatch(conError);
+			patchedJimpleBody = patch.applyPatch();
+			logger.info(patch.toPatchString());			
 		}
 		else if (error instanceof ForbiddenMethodError) {
+			
 			ForbiddenMethodError fMethodError = (ForbiddenMethodError) error;			
 			ForbiddenMethodPatch patch = new ForbiddenMethodPatch(fMethodError);
-			patch.getPatch();
-			logger.info("Create patch for "+fMethodError.getClass().getSimpleName());
-			logger.info(patch.toString());
+			patchedJimpleBody = patch.applyPatch();
+			logger.info(patch.toPatchString());			
 		}
 		else if (error instanceof NeverTypeOfError) {
+			
 			NeverTypeOfError nTypeError = (NeverTypeOfError) error;
-			logger.info("Create patch for "+nTypeError.getClass().getSimpleName());
-
-			AnalysisSeedWithSpecification seed = (AnalysisSeedWithSpecification) nTypeError.getObjectLocation();
-
-			CrySLPredicateExtractor extractor = new CrySLPredicateExtractor(seed, (CrySLPredicate) nTypeError.getBrokenConstraint());
-			PredicateConstraint predCon = extractor.extract();
-			
-			NeverTypeOfPatch patch = new NeverTypeOfPatch(nTypeError, predCon);
-			patchedJimpleBody = patch.getPatch();
-			logger.info(patch.toString());
+			NeverTypeOfPatch patch = new NeverTypeOfPatch(nTypeError);
+			patchedJimpleBody = patch.applyPatch();
+			logger.info(patch.toPatchString());			
 		}
-		else if (error instanceof ConstraintError) {
-			ConstraintError conError = (ConstraintError) error;
-			ISLConstraint brokenCon = conError.getBrokenConstraint();
-			//logger.info(conError.getClass().getSimpleName() +"_"+brokenCon.getClass().getSimpleName()+" :" + conError.toErrorMarkerString());
-			AnalysisSeedWithSpecification seed = (AnalysisSeedWithSpecification) conError.getObjectLocation();
+		else if(error instanceof TypestateError) {
 			
-				if(brokenCon instanceof CrySLComparisonConstraint) {
-					logger.info("Create patch for "+conError.getClass().getSimpleName() +"_"+brokenCon.getClass().getSimpleName()+" :" + conError.toErrorMarkerString());
+			TypestateError typeStateError = (TypestateError) error;
+			TypeStatePatch patch = new TypeStatePatch(typeStateError);
+			patch.applyPatch();
+			logger.info(patch.toPatchString());			
+		}
+		else if(error instanceof IncompleteOperationError) {
 
-					CrySLComparsionConstraintExtractor extractor = new CrySLComparsionConstraintExtractor(seed , (CrySLComparisonConstraint) brokenCon);
-					ComparisonConstraint primCon = extractor.extract();
-					PrimitiveConstraintPatch patch = new PrimitiveConstraintPatch(conError, primCon);
-					patchedJimpleBody = patch.getPatch();
-					error.getErrorLocation().getMethod().setActiveBody(patchedJimpleBody);
-					logger.info(patch.toString());
-				}
-				if(brokenCon instanceof CrySLValueConstraint) {
-					logger.info("Create patch for "+conError.getClass().getSimpleName() +"_"+brokenCon.getClass().getSimpleName()+" :" + conError.toErrorMarkerString());
-					CrySLValueConstraintExtractor extractor = new CrySLValueConstraintExtractor(seed, (CrySLValueConstraint) brokenCon);
-					ValueConstraint valCon = extractor.extract();
-					PrimitiveConstraintPatch patch = new PrimitiveConstraintPatch(conError, valCon);
-					patchedJimpleBody = patch.getPatch();
-					error.getErrorLocation().getMethod().setActiveBody(patchedJimpleBody);
-					logger.info(patch.toString());
-				}				
+			IncompleteOperationError incompleteError = (IncompleteOperationError) error;
+			IncompleteOperationPatch patch = new IncompleteOperationPatch(incompleteError);
+			patch.applyPatch();
+			logger.info(patch.toPatchString());			
+		}
+		else if (error instanceof RequiredPredicateError) {
+			
+			RequiredPredicateError reqPredicateErrpr = (RequiredPredicateError) error;
+			RequiredPredicatePatch patch = new RequiredPredicatePatch(reqPredicateErrpr);
+			patchedJimpleBody = patch.applyPatch();
+			logger.info(patch.toPatchString());			
 		}
 
 		return patchedJimpleBody;
 	}
 	
+	
+	private void printErrorInformation(AbstractError error) {
+		String errorType = "";
+		String errorRule = error.getRule().getClassName();
+		String errorClass = error.getErrorLocation().getMethod().getDeclaringClass().toString();
+		String errorOuterMethod = error.getErrorLocation().getMethod().getSignature();
+		String errorMessage = error.toErrorMarkerString();
+		
+		if (error instanceof ConstraintError) {
+			errorType = "ConstraintError";
+		} else if (error instanceof ForbiddenMethodError) {
+			errorType = "ForbiddenMethodError";
+		} else if (error instanceof NeverTypeOfError) {
+			errorType = "NeverTypeOfError";
+		} else if(error instanceof TypestateError) {
+			errorType = "TypestateError";
+		} else if(error instanceof IncompleteOperationError) {
+			errorType = "IncompleteOperationError";
+		} else if (error instanceof RequiredPredicateError) {
+			errorType = "RequiredPredicateError";
+		}
+		
+		StringBuilder builder = new StringBuilder();
+		builder.append("\n_________________________________________CogniCrypt_SAST_________________________________________\n");
+		builder.append("Detected: \t"+errorType+"\n");
+		builder.append("CrySLRule: \t"+errorRule+"\n");
+		builder.append("Class: \t\t"+errorClass+"\n");
+		builder.append("Method: \t"+errorOuterMethod+"\n");
+		builder.append("Message: \t"+errorMessage+"\n");
+		builder.append("_________________________________________________________________________________________________\n");
+		logger.info(builder.toString());
+		
+	}
+	
+	
+	
 	/*
 	 * Notes: Maybe just useful vor value constraints ??
 	 */
-	private int verifyPatch2(AbstractError error){
-		logger.info("Verify patch for "+error.getClass().getSimpleName()+" : " +error.toErrorMarkerString());
-
-		AnalysisSeedWithSpecification seed = null;
-		if(error instanceof ConstraintError) {
-			ConstraintError conError = (ConstraintError) error;
-			seed = (AnalysisSeedWithSpecification)conError.getObjectLocation();
-		}else {
-			seed = Utils.createSeed(error.getRule(), error.getErrorLocation().getMethod());
-
-		}
-		seed.execute();
-		Collection<Statement> collectedCalls = new HashSet<Statement>();
-		collectedCalls.add(error.getErrorLocation());		
-
-		CrySLResultsReporter resultsAggregator = new CrySLResultsReporter();
-		resultsAggregator.addReportListener(new CryptoAnalysisListener());
-		
-		ConstraintSolver solver = new ConstraintSolver(seed, collectedCalls, resultsAggregator);
-
-		resultsAggregator.checkedConstraints(seed, solver.getRelConstraints());
-		
-		
-		int errors = solver.evaluateRelConstraints();
-		return errors;
-	}
+//	private int verifyPatch2(AbstractError error){
+//		logger.info("Verify patch for "+error.getClass().getSimpleName()+" : " +error.toErrorMarkerString());
+//
+//		AnalysisSeedWithSpecification seed = null;
+//		if(error instanceof ConstraintError) {
+//			ConstraintError conError = (ConstraintError) error;
+//			seed = (AnalysisSeedWithSpecification)conError.getObjectLocation();
+//		}else {
+//			seed = Utils.createSeed(error.getRule(), error.getErrorLocation().getMethod());
+//
+//		}
+//		seed.execute();
+//		Collection<Statement> collectedCalls = new HashSet<Statement>();
+//		collectedCalls.add(error.getErrorLocation());		
+//
+//		CrySLResultsReporter resultsAggregator = new CrySLResultsReporter();
+//		resultsAggregator.addReportListener(new CryptoAnalysisListener());
+//		
+//		ConstraintSolver solver = new ConstraintSolver(seed, collectedCalls, resultsAggregator);
+//
+//		resultsAggregator.checkedConstraints(seed, solver.getRelConstraints());
+//		
+//		
+//		int errors = solver.evaluateRelConstraints();
+//		return errors;
+//	}
 	
 //	/*
 //	 * Notes: Maybe just useful vor value constraints ??
