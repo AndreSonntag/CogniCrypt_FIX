@@ -9,4 +9,3 @@ bin/
 *.class
 *.crysl
 ensuresPreds
-/src/main/java/de/upb/cognicryptfix/crysl/test/
