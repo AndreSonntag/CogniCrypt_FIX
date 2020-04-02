@@ -49,9 +49,7 @@ public class JimpleInvokeGenerator {
 		} else {
 			invokeExpr = Jimple.v().newVirtualInvokeExpr(invokingVar, ref, Arrays.asList(args));
 		}
-				
-		//TODO: dynamic invokes ??
-
+		
 		InvokeStmt invoke = Jimple.v().newInvokeStmt(invokeExpr);
 		return invoke;
 	}

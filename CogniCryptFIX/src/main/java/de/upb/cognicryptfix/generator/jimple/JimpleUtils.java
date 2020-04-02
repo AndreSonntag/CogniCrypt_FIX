@@ -1,5 +1,6 @@
 package de.upb.cognicryptfix.generator.jimple;
 
+import java.math.BigInteger;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.Collections;
 import java.util.List;
@@ -10,6 +11,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 import de.upb.cognicryptfix.Constants;
+import de.upb.cognicryptfix.exception.NoImplementerException;
 import de.upb.cognicryptfix.utils.ByteConstant;
 import de.upb.cognicryptfix.utils.InitializationMethodSorter;
 import soot.Body;
@@ -23,6 +25,7 @@ import soot.IntType;
 import soot.Local;
 import soot.LongType;
 import soot.PrimType;
+import soot.RefType;
 import soot.Scene;
 import soot.ShortType;
 import soot.SootClass;
@@ -55,17 +58,6 @@ public class JimpleUtils {
 		return Scene.v().getActiveHierarchy();
 	}
 
-	/**
-	 * <p>
-	 * Looks for a {@link Local} variable in a {@link Body}. <code>null</code> is
-	 * returned if the variable is not existing.
-	 * </p>
-	 * 
-	 * @param body The body in which the variable should be available.
-	 * @param name Name of the variable.
-	 * @return Returns the {@link Local} variable or <code>null</code> if the
-	 *         variable is not existing.
-	 */
 	public static Local getLocalByName(Body body, String name) {
 		Local local = body.getLocals().stream().filter(x -> name.equals(x.getName())).findAny().orElse(null);
 		return local;
@@ -78,8 +70,12 @@ public class JimpleUtils {
 			AssignStmt assignStmt = (AssignStmt) u;
 			if (assignStmt.containsInvokeExpr()) {
 				InvokeExpr invokeExpr = (InvokeExpr) assignStmt.getRightOpBox().getValue();
-				if (invokeExpr.getMethod().getName().equals("getInstance")) {
+				if (invokeExpr.getMethod().isStatic()) {
 					invokeLocal = (Local) assignStmt.getLeftOp();
+				} else {
+					invokeLocal = (Local) invokeExpr.getUseBoxes().stream()
+							.filter(useBox -> useBox instanceof JimpleLocalBox).map(ValueBox::getValue).findAny()
+							.orElse(null);
 				}
 			} else {
 				invokeLocal = (Local) assignStmt.getLeftOp();
@@ -94,8 +90,26 @@ public class JimpleUtils {
 		return invokeLocal;
 	}
 
+	public static boolean containsInvokeExpr(Unit u) {
+
+		if (u instanceof AssignStmt) {
+			AssignStmt assignStmt = (AssignStmt) u;
+			if (assignStmt.containsInvokeExpr()) {
+				return true;
+			}
+		} else if (u instanceof InvokeStmt) {
+			return true;
+		}
+
+		return false;
+	}
+
 	public static InvokeExpr getInvokeExpr(Unit u) {
 		InvokeExpr invokeExpr = null;
+
+		if (!containsInvokeExpr(u)) {
+			return invokeExpr;
+		}
 
 		if (u instanceof AssignStmt) {
 			AssignStmt assignStmt = (AssignStmt) u;
@@ -110,13 +124,12 @@ public class JimpleUtils {
 		return invokeExpr;
 	}
 
-	public static Constant generateDummyValueForType(Type type) {
+	public static Constant generateDummyConstantValue(Type type) {
 
 		Type objType = Scene.v().getType("java.lang.Object");
 		Type charType = Scene.v().getType("java.lang.Character");
 
 		if (type instanceof PrimType || type == Scene.v().getType("java.lang.String")) {
-
 			if (type == objType) {
 				return generateConstantValue(new Object());
 			} else if (type == BooleanType.v()) {
@@ -130,7 +143,7 @@ public class JimpleUtils {
 			} else if (type == ShortType.v()) {
 				return generateConstantValue(1);
 			} else if (type == ByteType.v()) {
-				return generateConstantValue((byte) 10);
+				return generateConstantValue((byte) 1);
 			} else if (type == charType) {
 				return generateConstantValue('c');
 			} else if (type == Scene.v().getType("java.lang.String")) {
@@ -147,6 +160,8 @@ public class JimpleUtils {
 			return generateConstantValue(object);
 		} else if (type == Scene.v().getType("java.lang.String[]")) {
 			return generateConstantValue(object);
+		} else if (type == BooleanType.v()) {
+			return generateConstantValue(Boolean.parseBoolean(object));
 		} else if (type == IntType.v()) {
 			return generateConstantValue(Integer.parseInt(object));
 		} else if (type == DoubleType.v()) {
@@ -209,7 +224,40 @@ public class JimpleUtils {
 		}
 	}
 
-	public static Entry<SootClass, SootMethod> getImplementingClassAndInitMethod(SootClass clazz) {
+	public static boolean isHighestSuperCryptoInterfaceOrAbstractClass(Type type) {
+		
+		if (type instanceof RefType) {
+			RefType refType = (RefType) type;
+			SootClass refTypeClazz = refType.getSootClass();
+
+			if (refTypeClazz.isInterface()) {
+				List<SootClass> superInterfaces = getHierarchy().getSuperinterfacesOf(refTypeClazz);
+				for (SootClass superInterface : superInterfaces) {
+					String packagePath = superInterface.getPackageName();
+					if (packagePath.contains("java.security") || packagePath.contains("javax.crypto")) {
+						return false;
+					} 
+				}
+				return true;
+			} else if (refTypeClazz.isAbstract()) {
+				List<SootClass> superAbstractClasses = getHierarchy().getSuperclassesOf(refTypeClazz);
+				for (SootClass superClasses : superAbstractClasses) {
+					String packagePath = superClasses.getPackageName();
+					if (packagePath.contains("java.security") || packagePath.contains("javax.crypto")) {
+						return false;
+					} 
+				}
+				return true;
+			} else {
+				return false;
+			}
+		} else {
+			return false;
+		}
+	}
+
+	public static Entry<SootClass, SootMethod> getImplementingClassAndInitMethod(SootClass clazz)
+			throws NoImplementerException {
 
 		if (clazz.isConcrete()) {
 			SootMethod init = getBestInitializationMethod(clazz);
@@ -222,7 +270,7 @@ public class JimpleUtils {
 
 				for (SootClass clazzCandidate : clazzCandidates) {
 					SootMethod initMethod = getBestInitializationMethod(clazzCandidate);
-					if(initMethod != null) {
+					if (initMethod != null) {
 						classInitMethodMap.put(clazzCandidate, initMethod);
 					}
 				}
@@ -237,11 +285,17 @@ public class JimpleUtils {
 						break;
 					}
 				}
-				return new SimpleEntry(winner, classInitMethodMap.get(winner));
+				return new SimpleEntry<SootClass, SootMethod>(winner, classInitMethodMap.get(winner));
+			} else {				
+				SootMethod init = getBestInitializationMethod(clazz);
+				if(init != null) {
+					return new SimpleEntry<SootClass, SootMethod>(clazz, init);
+				} else {
+					throw new NoImplementerException(clazz.getName());
+				}
 			}
-			return null;
 		} else {
-			return null;
+			throw new NoImplementerException(clazz.getName());
 		}
 	}
 
@@ -268,14 +322,14 @@ public class JimpleUtils {
 
 		List<SootMethod> initMethods = Lists.newArrayList();
 		for (SootMethod method : clazz.getMethods()) {
-			if ((method.isConstructor() || method.getName().contains("getInstance")) && method.isPublic()) {
+			if ((method.isConstructor() || method.getName().contains("getInstance")) && method.isPublic() && !method.isAbstract()) {
 				boolean useOfNotSupportedType = false;
-				for(Type parameterType : method.getParameterTypes()) {
-					if(Constants.notSupportedParameterTypes.contains(parameterType.toQuotedString())){
+				for (Type parameterType : method.getParameterTypes()) {
+					if (Constants.notSupportedParameterTypes.contains(parameterType.toQuotedString())) {
 						useOfNotSupportedType = true;
 					}
 				}
-				if(!useOfNotSupportedType) {
+				if (!useOfNotSupportedType) {
 					initMethods.add(method);
 				}
 			}

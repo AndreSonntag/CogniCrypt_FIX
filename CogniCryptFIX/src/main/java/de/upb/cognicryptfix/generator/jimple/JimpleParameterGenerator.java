@@ -9,6 +9,7 @@ import java.util.Map.Entry;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
+import de.upb.cognicryptfix.exception.NoImplementerException;
 import de.upb.cognicryptfix.utils.Utils;
 import soot.ArrayType;
 import soot.Body;
@@ -79,7 +80,7 @@ public class JimpleParameterGenerator {
 		if (type instanceof PrimType || type == Scene.v().getType("java.lang.String")) {
 			Type primType = type;
 			Local primeLocal = localGenerator.generateFreshLocal(primType, name);
-			Value primeValue = value == null ? JimpleUtils.generateDummyValueForType(primType) : JimpleUtils.generateConstantValue(value);
+			Value primeValue = value == null ? JimpleUtils.generateDummyConstantValue(primType) : JimpleUtils.generateConstantValue(value);
 			Unit primeAssignStmt = assignGenerator.generateAssignStmt(primeLocal, primeValue);
 			List<Unit> primeUnits = Lists.newArrayList();
 			primeUnits.add(primeAssignStmt);
@@ -94,12 +95,21 @@ public class JimpleParameterGenerator {
 			generatedUnits.put(arrayLocal, arrayUnits);
 
 		} else if (type instanceof RefType) {
-			
 			RefType refType = (RefType) type;
 			SootClass refTypeClazz = refType.getSootClass();
-			Entry<SootClass, SootMethod> init = JimpleUtils.getImplementingClassAndInitMethod(refTypeClazz);
-			SootClass initClazz  = init.getKey();
-			SootMethod initMethod = init.getValue();
+			Entry<SootClass, SootMethod> init = null;
+			SootClass initClazz = null;
+			SootMethod initMethod = null;
+			try {
+				init = JimpleUtils.getImplementingClassAndInitMethod(refTypeClazz);
+				initClazz = init.getKey();
+				initMethod = init.getValue();
+			} catch (NoImplementerException e) {
+				e.printStackTrace();
+				initClazz = Scene.v().getSootClass("java.lang.Object");
+				initMethod = initClazz.getMethodByName("");
+			}
+			
 			Local initLocal = localGenerator.generateFreshLocal(initClazz.getType(), name);
 		
 			generatedUnits.put(initLocal, Lists.newArrayList());

@@ -183,7 +183,6 @@ public class JimpleCodeGenerator {
 		SootMethodRef ref = method.makeRef();
 		InvokeExpr invokeExpr = null;
 
-		// TODO: virtual invoke normal calls, special invoke for construcotr
 		if (method.isStatic()) {
 			invokeExpr = Jimple.v().newStaticInvokeExpr(ref, Arrays.asList(args));
 		} else if (method.isConstructor()) {
@@ -191,7 +190,7 @@ public class JimpleCodeGenerator {
 		} else {
 			invokeExpr = Jimple.v().newVirtualInvokeExpr(var, ref, Arrays.asList(args));
 		}
-
+		// DynamicInvokeExpr not supported
 		InvokeStmt invoke = Jimple.v().newInvokeStmt(invokeExpr);
 		return invoke;
 	}
@@ -423,10 +422,9 @@ public class JimpleCodeGenerator {
 	private static void removeCaughtExceptionsByCatch(Body body, List<SootClass> exceptions, List<Unit> tryUnits) {
 		
 		Chain<Trap> traps = body.getTraps();
-		ArrayList bodyUnits = new ArrayList(body.getUnits());
+		ArrayList<Unit> bodyUnits = Lists.newArrayList(body.getUnits());
 		
 		for (Trap trap : traps) {
-			//TODO: check if it is necessary!
 			List<Unit> trapTryUnits = bodyUnits.subList(bodyUnits.indexOf(trap.getBeginUnit()), bodyUnits.indexOf(trap.getEndUnit()));
 			SootClass trapCatchException = trap.getException();
 			if (trapTryUnits.containsAll(tryUnits)) {
@@ -508,7 +506,7 @@ public class JimpleCodeGenerator {
 			}
 		}
 		Collections.sort(initMethods, new InitializationMethodSorter());
-		return initMethods.get(0);		//TODO modify back!!!!
+		return initMethods.get(0);
 	}
 	
 	private static SootClass getImplementedInterface(SootClass clazz) {

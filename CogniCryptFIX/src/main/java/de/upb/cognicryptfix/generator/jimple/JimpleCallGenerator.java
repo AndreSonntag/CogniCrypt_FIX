@@ -6,11 +6,13 @@ import java.util.Map;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
+import de.upb.cognicryptfix.utils.RequiredExceptionHandlingTag;
 import soot.Body;
 import soot.Local;
 import soot.SootMethod;
 import soot.Unit;
 import soot.jimple.InvokeStmt;
+import soot.tagkit.Tag;
 
 /**
  * @author Andre Sonntag
@@ -30,7 +32,7 @@ public class JimpleCallGenerator {
 	private JimpleLocalGenerator localGenerator;
 	private JimpleInvokeGenerator invokeGenerator;
 	private JimpleAssignGenerator assignGenerator;
-
+	
 	public JimpleCallGenerator(Body body) {
 		this.body = body;
 		this.localGenerator = new JimpleLocalGenerator(body);
@@ -60,8 +62,14 @@ public class JimpleCallGenerator {
 	public Map<Local, List<Unit>> generateVoidMethodCallUnits(Local var, SootMethod method,
 			Local... parameterLocals) {
 		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
+		Unit invoke = invokeGenerator.generateInvokeStmt(var, method, parameterLocals);
+	
+		if(!method.getExceptions().isEmpty()) {
+			invoke.addTag(new RequiredExceptionHandlingTag(Lists.newArrayList(invoke)));
+		}
+	
 		List<Unit> units = Lists.newArrayList();
-		units.add(invokeGenerator.generateInvokeStmt(var, method, parameterLocals));
+		units.add(invoke);
 		generatedUnits.put(var, units);
 		return generatedUnits;
 	}
@@ -70,9 +78,12 @@ public class JimpleCallGenerator {
 			Local... parameterLocals) {
 		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 
-		InvokeStmt invoke = (InvokeStmt) invokeGenerator.generateInvokeStmt(var, method, parameterLocals);
-		Unit assign = assignGenerator.generateAssignStmt(returnVar, invoke.getInvokeExpr());
-
+		Unit invoke =  invokeGenerator.generateInvokeStmt(var, method, parameterLocals);
+		Unit assign = assignGenerator.generateAssignStmt(returnVar, ((InvokeStmt) invoke).getInvokeExpr());
+		if(!method.getExceptions().isEmpty()) {
+			assign.addTag(new RequiredExceptionHandlingTag(Lists.newArrayList(assign)));
+		}
+		
 		List<Unit> units = Lists.newArrayList();
 		units.add(assign);
 		generatedUnits.put(returnVar, units);
@@ -84,8 +95,12 @@ public class JimpleCallGenerator {
 	public Map<Local, List<Unit>> generateSelfInitializeMethodCallUnits(Local var, SootMethod method, Local... parameterLocals) {
 		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 
-		InvokeStmt invoke = (InvokeStmt) invokeGenerator.generateInvokeStmt(var, method, parameterLocals);
-		Unit assign = assignGenerator.generateAssignStmt(var, invoke.getInvokeExpr());
+		Unit invoke =  invokeGenerator.generateInvokeStmt(var, method, parameterLocals);
+		Unit assign = assignGenerator.generateAssignStmt(var, ((InvokeStmt) invoke).getInvokeExpr());
+		
+		if(!method.getExceptions().isEmpty()) {
+			assign.addTag(new RequiredExceptionHandlingTag(Lists.newArrayList(assign)));
+		}
 
 		List<Unit> units = Lists.newArrayList();
 		units.add(assign);
@@ -102,6 +117,10 @@ public class JimpleCallGenerator {
 			Unit constructorInvoke = invokeGenerator.generateInvokeStmt(temp, method, parameterLocals);
 			Unit assign = assignGenerator.generateAssignStmt(var, temp);
 
+			if(!method.getExceptions().isEmpty()) {
+				assign.addTag(new RequiredExceptionHandlingTag(Lists.newArrayList(typeAssign, constructorInvoke, assign)));
+			}
+			
 			List<Unit> units = Lists.newArrayList();
 			units.add(typeAssign);
 			units.add(constructorInvoke);
