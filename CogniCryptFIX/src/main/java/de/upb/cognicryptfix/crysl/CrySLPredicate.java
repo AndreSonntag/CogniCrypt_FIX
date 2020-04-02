@@ -2,11 +2,9 @@ package de.upb.cognicryptfix.crysl;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 
 import crypto.interfaces.ICrySLPredicateParameter;
 import crypto.rules.CrySLCondPredicate;
@@ -21,39 +19,25 @@ public class CrySLPredicate {
 	private crypto.rules.CrySLPredicate predicate_;
 	private String predicateName;
 	private List<CrySLVariable> predicateParameters;
-	private LinkedList<CrySLMethodCall> generationPath;
+	private List<LinkedList<CrySLMethodCall>> generationPaths;
 	private CrySLEntity producer;
+	private boolean negated;
 
 	public CrySLPredicate(crypto.rules.CrySLPredicate predicate_, CrySLEntity producer) {
 		this.predicate_ = predicate_;
 		this.producer = producer;
 		this.predicateName = predicate_.getPredName();
 		this.predicateParameters = extractPredicateParameters();
-		this.generationPath = Lists.newLinkedList();
+		this.generationPaths = Lists.newLinkedList();
+		this.negated = predicate_.isNegated(); 
 	}
 
-	public int countRequiredParameterForPath() {
-		if(generationPath.isEmpty()) {
-			generationPath = getPath();
-		}	
+	public List<LinkedList<CrySLMethodCall>> getPaths(){
+		if (generationPaths.isEmpty()) {
+			generationPaths = calcPaths();
+		}
 		
-		int requiredPredicates = 0;
-		for(CrySLMethodCall call : generationPath) {
-				for(CrySLVariable parameter : call.getCallParameters()) {
-					if(producer.requiresPredicate(parameter)) {
-						requiredPredicates++;
-					}
-				}
-		}
-		return requiredPredicates;
-	}
-	
-	public LinkedList<CrySLMethodCall> getPath() {
-		if (generationPath.isEmpty()) {
-			List<LinkedList<CrySLMethodCall>> possiblePaths = calcPaths();
-			generationPath = calcPaths().get(0);
-		}
-		return generationPath;
+		return generationPaths;
 	}
 
 	private List<LinkedList<CrySLMethodCall>> calcPaths() {
@@ -69,16 +53,14 @@ public class CrySLPredicate {
 			return paths;
 		}
 	}
-	
-	//TODO: replace by variable pool ??
+
 	private List<CrySLVariable> extractPredicateParameters() {
 		List<CrySLVariable> predicateParameters = Lists.newArrayList();
 		List<ICrySLPredicateParameter> parameters = predicate_.getParameters();
 		for (ICrySLPredicateParameter parameter : parameters) {
 			CrySLObject predicateParameter = (CrySLObject) parameter;
 			String varName = predicateParameter.getVarName();
-			Type varType = varName.equals("this") ? Scene.v().getType(producer.getRule().getClassName()) : Utils.getType(producer.getRule(), varName);
-			predicateParameters.add(new CrySLVariable(varName, varType));
+			predicateParameters.add(producer.getVariableByName(varName));
 		}
 		return predicateParameters;
 	}
@@ -99,6 +81,10 @@ public class CrySLPredicate {
 		return predicateParameters;
 	}
 
+	public boolean isNegated() {
+		return negated;
+	}
+
 	@Override
 	public String toString() {
 		StringBuilder builder = new StringBuilder();
@@ -108,10 +94,7 @@ public class CrySLPredicate {
 		builder.append(",\n predicateName=");
 		builder.append(predicateName);
 		builder.append(",\n predicateParameters=");
-		builder.append(predicateParameters);
-		builder.append(" \n]");
+		builder.append(predicateParameters+"]");
 		return builder.toString();
 	}
-
-	
 }
