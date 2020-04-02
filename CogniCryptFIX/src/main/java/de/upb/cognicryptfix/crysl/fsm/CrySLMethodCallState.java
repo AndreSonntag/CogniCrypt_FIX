@@ -9,7 +9,6 @@ import com.google.common.collect.Maps;
 import de.upb.cognicryptfix.crysl.CrySLMethodCallCriteria;
 
 /**
- * TODO: documentation
  * @author Andre Sonntag
  * @date 10.03.2020
  */

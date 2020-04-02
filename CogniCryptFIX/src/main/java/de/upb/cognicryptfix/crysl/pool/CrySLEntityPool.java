@@ -5,6 +5,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -14,16 +17,19 @@ import de.upb.cognicryptfix.crysl.CrySLEntity;
 import de.upb.cognicryptfix.crysl.CrySLPredicate;
 import de.upb.cognicryptfix.crysl.CrySLVariable;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
+import de.upb.cognicryptfix.patcher.JimplePatcher;
 import de.upb.cognicryptfix.utils.Utils;
 import soot.Type;
 
 public class CrySLEntityPool {
 
+	private static final Logger logger = LogManager.getLogger(CrySLEntityPool.class);
 	private static CrySLEntityPool instance;
 	private List<CrySLRule> rules;
 	private List<CrySLEntity> entities;
 	private List<CrySLPredicate> predicates;
 	private Map<String, CrySLEntity> classNameCrySLEntityMap;
+
 
 	private CrySLEntityPool() {
 		this.rules = HeadlessRepairer.getCrySLRules();
@@ -39,7 +45,6 @@ public class CrySLEntityPool {
 		}
 		return CrySLEntityPool.instance;
 	}
-	
 	
 	private void createEntities() {
 		
@@ -65,7 +70,7 @@ public class CrySLEntityPool {
 		
 		Instant finish = Instant.now();
 		long timeElapsed = Duration.between(start, finish).toMillis();
-		System.out.println("Required time for CrySLEntityPool creation: "+timeElapsed+" ms");
+		logger.info("Required time for CrySLEntityPool creation: "+timeElapsed+" ms");
 	}
 	
 	public CrySLEntity getEntityByClassName(String className) {
@@ -97,5 +102,11 @@ public class CrySLEntityPool {
 		}
 		return false;
 	}
+
+	public List<CrySLPredicate> getPredicates() {
+		return predicates;
+	}
+	
+	
 	
 }

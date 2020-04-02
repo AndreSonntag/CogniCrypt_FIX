@@ -3,7 +3,6 @@ package de.upb.cognicryptfix.crysl.fsm;
 import de.upb.cognicryptfix.crysl.CrySLMethodCall;
 
 /**
- * TODO: documentation
  * @author Andre Sonntag
  * @date 10.03.2020
  */

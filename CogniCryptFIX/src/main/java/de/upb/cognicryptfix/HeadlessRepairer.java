@@ -27,6 +27,7 @@ public class HeadlessRepairer {
 	private static final Logger logger = LogManager.getLogger(HeadlessRepairer.class.getSimpleName());
  	private static CommandLine options;
  	private static List<CrySLRule> rules;
+ 	private static int repairRound = 0;
 
 	public static void main(String... args) throws ParseException {
 		infoLogLevel();
@@ -54,7 +55,18 @@ public class HeadlessRepairer {
 //	}
 	
 	public static List<CrySLRule> getCrySLRules() {
+		if(rules.isEmpty()) {
+			rules = readRules();
+		}
 		return rules;
+	}
+	
+	public static int getRepairRound() {
+		return repairRound;
+	}
+	
+	public static int increaseRepairRound() {
+		return repairRound++;
 	}
 	
 	private static List<CrySLRule> readRules(){

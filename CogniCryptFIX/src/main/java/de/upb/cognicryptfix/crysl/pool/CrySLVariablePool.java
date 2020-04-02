@@ -17,11 +17,11 @@ import crypto.rules.CrySLObject;
 import crypto.rules.CrySLRule;
 import crypto.rules.CrySLValueConstraint;
 import de.upb.cognicryptfix.crysl.CrySLVariable;
-import de.upb.cognicryptfix.extractor.constraints.ArithmeticConstraint;
-import de.upb.cognicryptfix.extractor.constraints.ComparisonConstraint;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
+import de.upb.cognicryptfix.utils.ArithmeticConstraintSolver;
 import de.upb.cognicryptfix.utils.Pair;
 import de.upb.cognicryptfix.utils.Utils;
+import soot.RefType;
 import soot.Scene;
 import soot.Value;
 import soot.jimple.NullConstant;
@@ -49,27 +49,33 @@ public class CrySLVariablePool {
 		for (Entry<String, String> object : rule.getObjects()) {
 			CrySLVariable variable = new CrySLVariable(object.getValue(), Utils.getType(rule, object.getValue()));
 			variables.add(variable);
-			nameVariableMap.put(variable.getVariable(), variable);
+			nameVariableMap.put(variable.getName(), variable);
 			variableISLConstraintMap.put(variable, Lists.newArrayList());
 			variableActiveConstraintMap.put(variable, null);
 		}
+		
+		CrySLVariable thisVar = new CrySLVariable("this", Scene.v().getType(rule.getClassName()));
+		variables.add(thisVar);
+		nameVariableMap.put(thisVar.getName(), thisVar);
+		variableISLConstraintMap.put(thisVar, Lists.newArrayList());
+		variableActiveConstraintMap.put(thisVar, null);
 
 		CrySLVariable initVar = new CrySLVariable(Utils.getAppropriateVarName(rule),
 				Scene.v().getType(rule.getClassName()));
 		variables.add(initVar);
-		nameVariableMap.put(initVar.getVariable(), initVar);
+		nameVariableMap.put(initVar.getName(), initVar);
 		variableISLConstraintMap.put(initVar, Lists.newArrayList());
 		variableActiveConstraintMap.put(initVar, null);
 
 		CrySLVariable voidReturnVar = new CrySLVariable("void", NullConstant.v().getType());
 		variables.add(voidReturnVar);
-		nameVariableMap.put(voidReturnVar.getVariable(), voidReturnVar);
+		nameVariableMap.put(voidReturnVar.getName(), voidReturnVar);
 		variableISLConstraintMap.put(voidReturnVar, Lists.newArrayList());
 		variableActiveConstraintMap.put(voidReturnVar, null);
 
 		CrySLVariable substitutedVar = new CrySLVariable("_", Utils.getType(rule, "_"));
 		variables.add(substitutedVar);
-		nameVariableMap.put(substitutedVar.getVariable(), substitutedVar);
+		nameVariableMap.put(substitutedVar.getName(), substitutedVar);
 		variableISLConstraintMap.put(substitutedVar, Lists.newArrayList());
 		variableActiveConstraintMap.put(substitutedVar, null);
 
@@ -171,21 +177,24 @@ public class CrySLVariablePool {
 		for (CrySLVariable variable : variableActiveConstraintMap.keySet()) {
 			if (variableActiveConstraintMap.get(variable) == null) {
 				continue;
+			} else if(variable.getType() instanceof RefType && variable.getType() != Scene.v().getType("java.lang.String")) {
+				continue;
+			} else if(variable.getType() == null) {
+				throw new RuntimeException(rule.getClassName()+" variable: "+variable.toString()+" Type is null.");
 			}
+			
 			ISLConstraint activeConstraint = variableActiveConstraintMap.get(variable);
-
 			if (activeConstraint instanceof CrySLComparisonConstraint) {
 				CrySLComparisonConstraint compCon = (CrySLComparisonConstraint) activeConstraint;
-				String operator = ComparisonConstraint.resolveComparsionOperator(compCon.getOperator());
+				String operator = Utils.resolveComparsionOperator(compCon.getOperator());
 
-				ArithmeticConstraint aritConPlus = new ArithmeticConstraint(CrySLArithmeticConstraint.ArithOp.p,
+				ArithmeticConstraintSolver aritConPlus = new ArithmeticConstraintSolver(CrySLArithmeticConstraint.ArithOp.p,
 						new Pair<String, String>("_", compCon.getRight().getLeft().getName()),
 						new Pair<String, String>("_", "1"));
-				ArithmeticConstraint aritConMinus = new ArithmeticConstraint(CrySLArithmeticConstraint.ArithOp.m,
+				ArithmeticConstraintSolver aritConMinus = new ArithmeticConstraintSolver(CrySLArithmeticConstraint.ArithOp.m,
 						new Pair<String, String>("_", compCon.getRight().getLeft().getName()),
 						new Pair<String, String>("_", "1"));
-				Value parameterValue = JimpleUtils.generateConstantValue(variable.getType(),
-						compCon.getRight().getLeft().getName());
+				Value parameterValue = JimpleUtils.generateConstantValue(variable.getType(), compCon.getRight().getLeft().getName());
 
 				switch (operator) {
 				case "<":
@@ -210,15 +219,14 @@ public class CrySLVariablePool {
 					variable.setValue(parameterValue);
 					break;
 				}
-				System.out.println(rule.getClassName() + " " + variable.getVariable() + " " + variable.getType() + " "
-						+ variable.getValue());
+//				System.out.println(rule.getClassName() + " " + variable.getVariable() + " " + variable.getType() + " "
+//						+ variable.getValue());
 
 			} else if (activeConstraint instanceof CrySLValueConstraint) {
 				CrySLValueConstraint valueCon = (CrySLValueConstraint) activeConstraint;
-				variable.setValue(
-						JimpleUtils.generateConstantValue(variable.getType(), valueCon.getValueRange().get(0)));
-				System.out.println(rule.getClassName() + " " + variable.getVariable() + " " + variable.getType() + " "
-						+ variable.getValue());
+				variable.setValue(JimpleUtils.generateConstantValue(variable.getType(), valueCon.getValueRange().get(0)));
+//				System.out.println(rule.getClassName() + " " + variable.getVariable() + " " + variable.getType() + " "
+//						+ variable.getValue());
 			}
 
 		}

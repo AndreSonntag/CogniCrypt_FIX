@@ -1,7 +1,6 @@
 package de.upb.cognicryptfix.crysl;
 
 /**
- * TODO: documentation
  * @author Andre Sonntag
  * @date 10.03.2020
  */

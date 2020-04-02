@@ -24,22 +24,22 @@ public class CrySLReaderUtils {
 
 	public static List<CrySLRule> readRulesFromSourceFiles(final String folderPath) {
 
+		File temp = null;
 		try {
 			CrySLModelReader analysisCrySLReader = new CrySLModelReader();
 			List<CrySLRule> rules = new ArrayList<CrySLRule>();
 			File[] files = new File(folderPath).listFiles();
 			for (File file : files) {
 				if (file != null && file.getName().endsWith(".crysl")) {
+					temp = file;
 					rules.add(analysisCrySLReader.readRule(file));
 				}
 			}
-
 			return rules;
 		} catch (MalformedURLException e) {
-			// TODO Auto-generated catch block
+			logger.error("Problem with rule: "+temp.getAbsolutePath());
 			e.printStackTrace();
 		}
-		
 		return null;
 	}
 

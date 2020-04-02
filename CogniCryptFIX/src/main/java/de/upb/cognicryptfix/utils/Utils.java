@@ -9,6 +9,7 @@ import java.util.Map.Entry;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 
@@ -26,6 +27,8 @@ import crypto.rules.CrySLPredicate;
 import crypto.rules.CrySLRule;
 import crypto.rules.CrySLValueConstraint;
 import crypto.rules.TransitionEdge;
+import crypto.rules.CrySLArithmeticConstraint.ArithOp;
+import crypto.rules.CrySLComparisonConstraint.CompOp;
 import de.upb.cognicryptfix.analysis.CryptoAnalysis;
 import de.upb.cognicryptfix.crysl.CrySLEntity;
 import de.upb.cognicryptfix.crysl.CrySLMethodCall;
@@ -33,6 +36,7 @@ import soot.IntType;
 import soot.Scene;
 import soot.SootMethod;
 import soot.Type;
+import soot.Unit;
 import soot.Value;
 import soot.jimple.AssignStmt;
 import soot.jimple.Constant;
@@ -49,6 +53,7 @@ public class Utils {
 
 	private static final Logger logger = LogManager.getLogger(Utils.class);
 	
+	//TODO: move to SootJimpleUtils
 	public static Type getType(CrySLRule rule, String var) {
 		ArrayList<TransitionEdge> transitions = new ArrayList<TransitionEdge>(
 				rule.getUsagePattern().getAllTransitions());
@@ -71,61 +76,31 @@ public class Utils {
 		return null;
 	}
 	
-	public static AnalysisSeedWithSpecification createSeed(CrySLRule rule, SootMethod method) {
-
-		AnalysisSeedWithSpecification ret = null;
-
-		if (method == null || !method.hasActiveBody() || !method.getDeclaringClass().isApplicationClass()) {
-			throw new RuntimeException("upppsss");
-		}
-
-		ClassSpecification spec = new ClassSpecification(rule, CryptoAnalysis.staticScanner);
-		spec.invokesForbiddenMethod(method);
-
-		if (spec.getRule().getClassName().equals("javax.crypto.SecretKey")) {
-			throw new RuntimeException("upppsss");
-		}
-		for (Query seed : spec.getInitialSeeds(method)) {
-			ret = CryptoAnalysis.staticScanner.getOrCreateSeedWithSpec(
-					new AnalysisSeedWithSpecification(CryptoAnalysis.staticScanner, seed.stmt(), seed.var(), spec));
-		}
-		return ret;
-	}
+//	public static AnalysisSeedWithSpecification createSeed(CrySLRule rule, SootMethod method) {
+//
+//		AnalysisSeedWithSpecification ret = null;
+//
+//		if (method == null || !method.hasActiveBody() || !method.getDeclaringClass().isApplicationClass()) {
+//			throw new RuntimeException("upppsss");
+//		}
+//
+//		ClassSpecification spec = new ClassSpecification(rule, CryptoAnalysis.staticScanner);
+//		spec.invokesForbiddenMethod(method);
+//
+//		if (spec.getRule().getClassName().equals("javax.crypto.SecretKey")) {
+//			throw new RuntimeException("upppsss");
+//		}
+//		for (Query seed : spec.getInitialSeeds(method)) {
+//			ret = CryptoAnalysis.staticScanner.getOrCreateSeedWithSpec(
+//					new AnalysisSeedWithSpecification(CryptoAnalysis.staticScanner, seed.stmt(), seed.var(), spec));
+//		}
+//		return ret;
+//	}
 
 	public static MavenProject createAndCompile(String mavenProjectPath) {
 		MavenProject mi = new MavenProject(mavenProjectPath);
 		mi.compile();
 		return mi;
-	}
-
-	public static String constraintToString(ISLConstraint constraint) {
-		StringBuilder builder = new StringBuilder();
-
-		if (constraint instanceof CrySLConstraint) {
-			CrySLConstraint con = (CrySLConstraint) constraint;
-			builder.append("\n" + con.getClass().getSimpleName() + "[\n");
-			builder.append("left = " + con.getLeft() + "\n");
-			builder.append("right = " + con.getRight() + "\n");
-			builder.append("op = " + con.getOperator() + "\n");
-
-		} else if (constraint instanceof CrySLValueConstraint) {
-			CrySLValueConstraint con = (CrySLValueConstraint) constraint;
-			builder.append("\n" + con.getClass().getSimpleName() + "[\n");
-			builder.append(con.toString() + "]\n");
-
-		} else if (constraint instanceof CrySLPredicate) {
-			CrySLPredicate con = (CrySLPredicate) constraint;
-			builder.append("\n" + con.getClass().getSimpleName() + "[\n");
-			builder.append(con.toString() + "]\n");
-
-		} else if (constraint instanceof CrySLComparisonConstraint) {
-			CrySLComparisonConstraint con = (CrySLComparisonConstraint) constraint;
-			builder.append("\n" + con.getClass().getSimpleName() + "[\n");
-			builder.append(con.toString() + "]\n");
-		}
-
-		return builder.toString();
-
 	}
 
 	public static Map<String, CallSiteWithExtractedValue> extractValueAsString(AnalysisSeedWithSpecification seed,
@@ -178,7 +153,15 @@ public class Utils {
 	public static boolean isNullOrEmpty(final Collection<?> c) {
 		return c == null || c.isEmpty();
 	}
-
+	
+	public static List<Unit> summarizeUnitLists(Collection<List<Unit>> unitLists){
+		List<Unit> summaryList = Lists.newArrayList();
+		for (List<Unit> l : unitLists) {
+			summaryList.addAll(l);
+		}
+		return summaryList;
+	}
+	
 	public static String getAppropriateVarName(CrySLRule rule) {
 		
 		String[] splitClassName = rule.getClassName().split("\\.");
@@ -201,6 +184,36 @@ public class Utils {
 		}
 
 		System.out.println(builder.toString());
+	}
+	
+	public static String resolveComparsionOperator(CompOp op) {
+		switch (op) {
+		case l:
+			return "<";
+		case le:
+			return "<=";
+		case g:
+			return ">";
+		case ge:
+			return ">=";
+		case neq:
+			return "!=";
+		default:
+			return "=";
+		}
+	}
+	
+	public static String resolveArithmeticOperator(ArithOp op) {
+		switch (op) {
+		case p:
+			return "+";
+		case n:
+			return "-";
+		case m:
+			return ">";
+		default:
+			return "something went wrong";
+		}
 	}
 
 }

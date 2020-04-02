@@ -1,29 +1,36 @@
 package de.upb.cognicryptfix.crysl;
 
 import soot.ArrayType;
+import soot.RefType;
+import soot.Scene;
 import soot.Type;
 import soot.Value;
+import soot.jimple.AssignStmt;
 
 /**
- * TODO: documentation
  * @author Andre Sonntag
- *
  */
 public class CrySLVariable {
 	
-	private String variable;
+	private String name;
 	private Type type;
 	private Value value;
 	
-	public CrySLVariable(String variable, Type type) {
+	public CrySLVariable(CrySLVariable copy) {
+		this.name = copy.getName();
+		this.type = copy.getType();
+		this.value = copy.getValue();
+	}
+
+	public CrySLVariable(String name, Type type) {
 		super();
-		this.variable = variable;
+		this.name = name;
 		this.type = type;
 	}
 	
-	public CrySLVariable(String variable, Type type, Value value) {
+	public CrySLVariable(String name, Type type, Value value) {
 		super();
-		this.variable = variable;
+		this.name = name;
 		this.type = type;
 		this.value = value;
 	}
@@ -36,12 +43,12 @@ public class CrySLVariable {
 		}
 	}
 
-	public String getVariable() {
-		return variable;
+	public String getName() {
+		return name;
 	}
 
-	public void setVariable(String variable) {
-		this.variable = variable;
+	public void setName(String name) {
+		this.name = name;
 	}
 
 	public Type getType() {
@@ -60,14 +67,13 @@ public class CrySLVariable {
 		this.value = value;
 	}
 	
-	
 
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
 		result = prime * result + ((type == null) ? 0 : type.hashCode());
-		result = prime * result + ((variable == null) ? 0 : variable.hashCode());
+		result = prime * result + ((name == null) ? 0 : name.hashCode());
 		return result;
 	}
 
@@ -85,10 +91,10 @@ public class CrySLVariable {
 				return false;
 		} else if (type != other.type)
 			return false;
-		if (variable == null) {
-			if (other.variable != null)
+		if (name == null) {
+			if (other.name != null)
 				return false;
-		} else if (!variable.equals(other.variable))
+		} else if (!name.equals(other.name))
 			return false;
 		return true;
 	}
@@ -96,8 +102,8 @@ public class CrySLVariable {
 	@Override
 	public String toString() {
 		StringBuilder builder = new StringBuilder();
-		builder.append("CrySLVariable [variable=");
-		builder.append(variable);
+		builder.append("CrySLVariable [name=");
+		builder.append(name);
 		builder.append(", type=");
 		builder.append(type);
 		builder.append("]");

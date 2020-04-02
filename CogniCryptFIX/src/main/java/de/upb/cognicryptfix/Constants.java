@@ -15,7 +15,7 @@ public class Constants {
 	public final static List<String> predefinedPreds = Arrays.asList("callTo", "noCallTo", "neverTypeOf", "length", "notHardCoded");
 	public final static List<String> notSupportedPredicates = Arrays.asList("generatedManagerFactoryParameters");
 	public final static List<String> notSupportedParameterTypes = Arrays.asList("java.io.FileDescriptor", "java.security.KeyStore$LoadStoreParameter", "java.security.cert.Certificate");
-
+	public final static String requiredExceptionHandlingTag = "de.upb.cognicryptfix.RequiredExceptionHandlingUnit";
 	
 
 }

@@ -14,8 +14,6 @@ import soot.Scene;
 import soot.SootMethod;
 
 /**
- * TODO: documentation
- * 
  * @author Andre Sonntag
  * @date 10.03.2020
  */
@@ -31,6 +29,7 @@ public class CrySLMethodCall {
 	private int requiredUserInteractions;
 	private int requiredRefTypeGenerations;
 	private boolean initCall;
+	private boolean negatesPredicate;
 
 	public CrySLMethodCall(CrySLRule rule, SootMethod sootMethod, CrySLMethod cryslMethod, CrySLVariablePool pool) {
 		this.rule = rule;
@@ -43,24 +42,23 @@ public class CrySLMethodCall {
 		this.requiredUserInteractions = countUserIteractions();
 		this.requiredRefTypeGenerations = countRefTypeParamterGeneration();
 		this.callCriteria = new CrySLMethodCallCriteria(requiredUserInteractions,requiredRefTypeGenerations);
+		this.negatesPredicate = false;
 	}
 	
 	private int countRefTypeParamterGeneration() {
 		int countRequiredRefTypeGenerations = 0;
-		
 		for (CrySLVariable parameter : callParameters) {
 			if (parameter.getType() instanceof RefType && parameter.getType() != Scene.v().getType("java.lang.String")) {
 				countRequiredRefTypeGenerations++;
 			}
 		}
-
 		return countRequiredRefTypeGenerations;
 	}
 
 	private int countUserIteractions() {
 		int countRequiredUserInteractions = 0;
 		for (CrySLVariable parameter : callParameters) {
-			if (parameter.getVariable().equals("_")) {
+			if (parameter.getName().equals("_")) {
 				countRequiredUserInteractions += 2;
 			} else {
 				if(pool.getVariableConstraint(parameter) == null ) {
@@ -99,6 +97,10 @@ public class CrySLMethodCall {
 	public List<CrySLVariable> getCallParameters() {
 		return callParameters;
 	}
+	
+	public int getParamterIndex(CrySLVariable paramter) {
+		return callParameters.indexOf(paramter);
+	}
 
 	public CrySLVariable getCallReturn() {
 		return callReturn;
@@ -115,6 +117,16 @@ public class CrySLMethodCall {
 	public CrySLRule getRule() {
 		return rule;
 	}
+	
+	public boolean isNegatesPredicate() {
+		return negatesPredicate;
+	}
+
+	public void setNegatesPredicate(boolean negatesPredicate) {
+		this.negatesPredicate = negatesPredicate;
+	}
+
+
 
 	@Override
 	public String toString() {
@@ -125,12 +137,12 @@ public class CrySLMethodCall {
 		builder.append(sootMethod.getSignature());
 		builder.append(", crySLMethod=");
 		builder.append(crySLMethod.getMethodName());
-		builder.append(", callParameters=");
-		builder.append(callParameters);
-		builder.append(", callReturn=");
-		builder.append(callReturn);
-		builder.append(", callCriteria=");
-		builder.append(callCriteria);
+//		builder.append(", callParameters=");
+//		builder.append(callParameters);
+//		builder.append(", callReturn=");
+//		builder.append(callReturn);
+//		builder.append(", callCriteria=");
+//		builder.append(callCriteria);
 		builder.append("]");
 		return builder.toString();
 	}

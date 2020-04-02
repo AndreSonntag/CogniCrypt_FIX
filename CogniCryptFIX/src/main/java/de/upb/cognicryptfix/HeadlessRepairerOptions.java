@@ -9,6 +9,8 @@ import org.apache.commons.cli.Options;
  */
 public class HeadlessRepairerOptions extends Options {
 
+	private static final long serialVersionUID = 1L;
+
 	public HeadlessRepairerOptions() {
 
 		Option rulesDir = Option.builder().longOpt("rulesDir").hasArg().required()
@@ -24,5 +26,8 @@ public class HeadlessRepairerOptions extends Options {
 				.desc("The class path of the application, excluding dependencies. Objects within theses classes are analyzed.")
 				.build();
 		addOption(applicationCp);
+		
+
+		//TODO: insert option to choose the error type which should be repaird!
 	}
 }
