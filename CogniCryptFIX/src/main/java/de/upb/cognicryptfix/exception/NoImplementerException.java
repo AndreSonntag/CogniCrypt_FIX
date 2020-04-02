@@ -1,15 +1,14 @@
 package de.upb.cognicryptfix.exception;
 
-public class NoEnsuredPredicateException extends Exception {
+public class NoImplementerException extends Exception {
 	
 	private static final long serialVersionUID = 1L;
 
-	public NoEnsuredPredicateException(String errorMessage) {
+	public NoImplementerException(String errorMessage) {
         super(errorMessage);
     }
 	
-	public NoEnsuredPredicateException() {
+	public NoImplementerException() {
         super();
     }
-
 }
