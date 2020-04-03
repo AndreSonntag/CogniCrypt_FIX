@@ -11,6 +11,7 @@ import org.apache.logging.log4j.Logger;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.io.Files;
 
 import boomerang.callgraph.ObservableDynamicICFG;
 import boomerang.callgraph.ObservableICFG;
@@ -27,7 +28,6 @@ import soot.Scene;
 import soot.SceneTransformer;
 import soot.SootClass;
 import soot.SootMethod;
-import soot.SootResolver;
 import soot.Transform;
 import soot.Unit;
 import soot.options.Options;
@@ -43,6 +43,8 @@ public class CryptoAnalysis {
 	private CG DEFAULT_CALL_GRAPH = CG.CHA;
 	private List<CrySLRule> rules;
 	public static CryptoScanner staticScanner = null;
+	public static int run;
+	
 	
 	public static enum CG {
 		CHA, SPARK_LIBRARY, SPARK
@@ -50,6 +52,7 @@ public class CryptoAnalysis {
 	
 	public CryptoAnalysis(List<CrySLRule> rules) {
 		this.rules = rules;
+		this.run = 0;
 	}
 
 	private SceneTransformer createAnalysisTransformer(final CrySLAnalysisListener listener) {
@@ -57,14 +60,14 @@ public class CryptoAnalysis {
 
 			@Override
 			protected void internalTransform(final String phaseName, final Map<String, String> options) {
+				BoomerangPretransformer.v().reset();
 				BoomerangPretransformer.v().apply();
 				final ObservableDynamicICFG icfg = new ObservableDynamicICFG(true);
 				CryptoScanner scanner = new CryptoScanner() {
-
 					@Override
 					public ObservableICFG<Unit, SootMethod> icfg() {
 						return icfg;
-					}
+					}					
 				};
 				staticScanner = scanner;
 				scanner.getAnalysisListener().addReportListener(listener);
@@ -73,9 +76,27 @@ public class CryptoAnalysis {
 		};
 	}
 	
+	public boolean runSoot(final String jimpleOutputPath, final CrySLAnalysisListener listener) {
+		CryptoAnalysis.run++;
+		logger.info("CRYPTOANALYSIS RUN: "+run+" ##################################################################");
+		deleteIncludeListJimpleFiles();
+		G.reset();
+		setSootOptions(jimpleOutputPath);
+		registerTransformers(listener);
+		try {
+			runSoot();
+		}
+		catch (final Exception t) {
+			t.printStackTrace();
+			logger.error(t);
+			return false;
+		}
+		return true;
+	}
+	
 	
 	public boolean runSoot(final MavenProject project, final CrySLAnalysisListener listener) {
-		G.reset();
+		logger.info("CRYPTOANALYSIS RUN: "+run+" ##################################################################");
 		setSootOptions(project);
 		registerTransformers(listener);
 		try {
@@ -93,8 +114,53 @@ public class CryptoAnalysis {
 		Scene.v().loadNecessaryClasses();
 		PackManager.v().getPack("cg").apply();
 		PackManager.v().getPack("wjtp").apply();
+	    PackManager.v().writeOutput();
 	}
-
+	
+	private void deleteIncludeListJimpleFiles() {
+		List<String> includeList = getIncludeList();
+		File[] files = new File(Constants.jimpleOutputPath).listFiles();
+		for(File f : files) {
+			String name = Files.getNameWithoutExtension(f.getName());
+			if(includeList.contains(name)) {
+				f.delete();
+			}
+		}
+	}
+	
+	private void setSootOptions(String jimpleOutputPath) {
+		G.v().reset();
+		switch (DEFAULT_CALL_GRAPH.ordinal()) {
+		case 2:
+			Options.v().setPhaseOption("cg.spark", "on");
+			Options.v().setPhaseOption("cg", "all-reachable:true,library:any-subtype");
+			break;
+		case 0:
+		default:
+			Options.v().setPhaseOption("cg.cha", "on");
+			Options.v().setPhaseOption("cg", "all-reachable:true");
+		}
+		Options.v().setPhaseOption("jb", "use-original-names:true");
+		Options.v().set_src_prec(Options.src_prec_jimple);
+		Options.v().set_output_format(Options.output_format_jimple);
+		Options.v().set_force_overwrite(true);
+		Options.v().set_output_dir(pathToJimpleOutput());
+		Options.v().set_no_bodies_for_excluded(true);
+		Options.v().set_allow_phantom_refs(true);
+		Options.v().set_whole_program(true);
+		Options.v().set_keep_line_number(true);
+		Options.v().set_prepend_classpath(true);
+		Options.v().set_soot_classpath(jimpleOutputPath+ File.pathSeparator + pathToJCE());
+		Options.v().set_process_dir(Lists.newArrayList(jimpleOutputPath));
+		Options.v().set_include(getIncludeList());
+		Options.v().set_exclude(getExcludeList());
+		Options.v().set_full_resolver(true);
+		addUnsolvedClasses();
+		Scene.v().loadNecessaryClasses();
+		Scene.v().setEntryPoints(getEntryPoints());
+		logger.info("initializing soot for Jimple files");
+	}
+	
 	private void setSootOptions(final MavenProject project) {
 		G.v().reset();
 		switch (DEFAULT_CALL_GRAPH.ordinal()) {
@@ -108,21 +174,24 @@ public class CryptoAnalysis {
 			Options.v().setPhaseOption("cg", "all-reachable:true");
 		}
 		Options.v().setPhaseOption("jb", "use-original-names:true");
-		Options.v().set_output_format(Options.output_format_none);
+		Options.v().set_output_format(Options.output_format_jimple);
+		Options.v().set_force_overwrite(true);
+		Options.v().set_output_dir(pathToJimpleOutput());
 		Options.v().set_no_bodies_for_excluded(true);
 		Options.v().set_allow_phantom_refs(true);
 		Options.v().set_whole_program(true);
 		Options.v().set_keep_line_number(true);
 		Options.v().set_prepend_classpath(true);
-		Options.v().set_soot_classpath(getSootClasspath(project)+ File.pathSeparator + pathToJCE() + File.pathSeparator+ pathToJCAJar());
-		Options.v().set_process_dir(Lists.newArrayList(project.getBuildDirectory(),pathToJCAJar()));
+		Options.v().set_soot_classpath(getSootClasspath(project)+ File.pathSeparator + pathToJCE());
+		Options.v().set_process_dir(Lists.newArrayList(project.getBuildDirectory()));
 		Options.v().set_include(getIncludeList());
 		Options.v().set_exclude(getExcludeList());
 		Options.v().set_full_resolver(true);
+		Options.v().set_validate(true);
 		addUnsolvedClasses();
 		Scene.v().loadNecessaryClasses();
 		Scene.v().setEntryPoints(getEntryPoints());
-		logger.info("initializing soot");
+		logger.info("initializing soot for Maven project");
 	}
 
 	private List<SootMethod> getEntryPoints() {
@@ -214,8 +283,9 @@ public class CryptoAnalysis {
 		return System.getProperty("java.home") + File.separator + "lib" + File.separator + "jce.jar";
 	}
 	
-	private String pathToJCAJar() {
-		return new File(CryptoAnalysis.class.getResource("/JCAJar/JCARulesetImporter-0.0.1.jar").getPath()).getAbsolutePath();
+	private String pathToJimpleOutput() {
+		File outputFolderFile = new File(Constants.jimpleOutputPath);
+		return outputFolderFile.getAbsolutePath();
 	}
 	
 	public static CryptoScanner getCryptoScanner() {

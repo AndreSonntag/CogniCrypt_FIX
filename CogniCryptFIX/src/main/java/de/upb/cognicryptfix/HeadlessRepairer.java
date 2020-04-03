@@ -44,15 +44,10 @@ public class HeadlessRepairer {
 		
 		CryptoAnalysis analysis = new CryptoAnalysis(rules);
 		CryptoAnalysisListener listener = new CryptoAnalysisListener();
-		analysis.runSoot(analysingProject, listener);
-		
-	}
-	
-//	public static void run() {
-//		CryptoAnalysis analysis = new CryptoAnalysis();
-//		CryptoAnalysisListener listener = new CryptoAnalysisListener();
 //		analysis.runSoot(analysingProject, listener);
-//	}
+		analysis = new CryptoAnalysis(rules);
+		analysis.runSoot(Constants.jimpleOutputPath, listener);
+	}
 	
 	public static List<CrySLRule> getCrySLRules() {
 		if(rules.isEmpty()) {

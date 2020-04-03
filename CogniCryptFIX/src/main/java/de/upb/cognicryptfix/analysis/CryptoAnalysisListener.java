@@ -2,12 +2,14 @@ package de.upb.cognicryptfix.analysis;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Table;
 
@@ -55,7 +57,7 @@ public class CryptoAnalysisListener extends CrySLAnalysisListener{
 	private List<AbstractError> reqPredicateError;
 	private List<AbstractError> typeStateError;
 	private List<AbstractError> ruleClassError;
-
+	
 	public CryptoAnalysisListener() {
 		errors = Lists.newArrayList();
 		fMethodError = Lists.newArrayList();
@@ -71,7 +73,6 @@ public class CryptoAnalysisListener extends CrySLAnalysisListener{
 			ruleClassNames.add(rule.getClassName());
 		}
 	}
-	
 	
 	public void reportError(AbstractError error) {
 		if(ruleClassNames.contains(error.getErrorLocation().getMethod().getDeclaringClass().toString())){
@@ -105,12 +106,13 @@ public class CryptoAnalysisListener extends CrySLAnalysisListener{
 		errors.addAll(typeStateError);
 		errors.addAll(incompleteError);
 		errors.addAll(reqPredicateError);
-
+		logger.info("DETECTED ERRORS: "+errors.size());
 		IPatcher patcher = new JimplePatcher();
 		for(AbstractError e : errors) {
 			patcher.getPatchedClass(e);
 		}		
 	}
+	
 
 	public void afterConstraintCheck(AnalysisSeedWithSpecification arg0) {}
 
@@ -149,5 +151,4 @@ public class CryptoAnalysisListener extends CrySLAnalysisListener{
 	@Override
 	public void addProgress(int arg0, int arg1) {}
 
-	
 }
