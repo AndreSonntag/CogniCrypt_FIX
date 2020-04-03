@@ -53,7 +53,7 @@ import soot.jimple.StringConstant;
 import soot.toolkits.graph.ExceptionalUnitGraph;
 import soot.util.Chain;
 @Deprecated
-public class JimpleCodeGenerator {
+public class OldJimpleCodeGenerator {
 
 //	Aggregator.v().transform(body);
 	private static FastHierarchy hierarchy = Scene.v().getOrMakeFastHierarchy();
@@ -114,7 +114,7 @@ public class JimpleCodeGenerator {
 	 * @return Returns a fresh generated {@link Local} array variable.
 	 */
 	public static Local genereateFreshArrayLocal(Body body, Type type, int dimension) {
-		return generateFreshLocal(body, JimpleCodeGenerator.getParameterArrayType(type, 1));
+		return generateFreshLocal(body, OldJimpleCodeGenerator.getParameterArrayType(type, 1));
 	}
 
 	/**
@@ -129,7 +129,7 @@ public class JimpleCodeGenerator {
 	 * @return Returns a fresh generated {@link Local} Array variable.
 	 */
 	public static Local genereateFreshArrayLocal(Body body, Type type, String name, int dimension) {
-		Local l = generateFreshLocal(body, JimpleCodeGenerator.getParameterArrayType(type, 1));
+		Local l = generateFreshLocal(body, OldJimpleCodeGenerator.getParameterArrayType(type, 1));
 		if (!name.isEmpty())
 			l.setName(name);
 		return l;
@@ -337,9 +337,9 @@ public class JimpleCodeGenerator {
 
 		if (type instanceof PrimType) {
 			PrimType primType = (PrimType) type;
-			Local primeLocal = JimpleCodeGenerator.generateFreshLocal(body, primType, name);
-			Unit valueAssign = JimpleCodeGenerator.generateAssignStmt(primeLocal,
-					JimpleCodeGenerator.generateConstantValue(value));
+			Local primeLocal = OldJimpleCodeGenerator.generateFreshLocal(body, primType, name);
+			Unit valueAssign = OldJimpleCodeGenerator.generateAssignStmt(primeLocal,
+					OldJimpleCodeGenerator.generateConstantValue(value));
 
 			List<Unit> units = Lists.newArrayList();
 			units.add(valueAssign);
@@ -347,8 +347,8 @@ public class JimpleCodeGenerator {
 			return generatedUnits;
 		} else if (type instanceof ArrayType) {
 			ArrayType arrayType = (ArrayType) type;
-			Local arrayLocal = JimpleCodeGenerator.genereateFreshArrayLocal(body, arrayType.baseType, name, 1);
-			Unit arrayAssign = JimpleCodeGenerator.generateArrayAssignStmt(arrayLocal, arrayType.baseType, 1);
+			Local arrayLocal = OldJimpleCodeGenerator.genereateFreshArrayLocal(body, arrayType.baseType, name, 1);
+			Unit arrayAssign = OldJimpleCodeGenerator.generateArrayAssignStmt(arrayLocal, arrayType.baseType, 1);
 
 			List<Unit> units = Lists.newArrayList();
 			units.add(arrayAssign);
@@ -377,22 +377,22 @@ public class JimpleCodeGenerator {
 				}
 			}
 
-			Local refTypeLocal = JimpleCodeGenerator.generateFreshLocal(body, refType, name);
+			Local refTypeLocal = OldJimpleCodeGenerator.generateFreshLocal(body, refType, name);
 			Value[] parameterLocals = generatedParameterUnits.keySet().toArray(new Value[0]);
 
 			if (initMethod.isStatic()) {
-				Unit staticInvoke = JimpleCodeGenerator.generateInvokeStmt(refTypeLocal, initMethod, parameterLocals);
-				Unit assign = JimpleCodeGenerator.generateAssignStmt(refTypeLocal,
+				Unit staticInvoke = OldJimpleCodeGenerator.generateInvokeStmt(refTypeLocal, initMethod, parameterLocals);
+				Unit assign = OldJimpleCodeGenerator.generateAssignStmt(refTypeLocal,
 						staticInvoke.getUseBoxes().get(0).getValue());
 
 				List<Unit> units = Lists.newArrayList();
 				units.add(assign);
 				generatedUnits.put(refTypeLocal, units);
 			} else {
-				Local temp = JimpleCodeGenerator.generateFreshLocal(body, refType);
-				Unit typeAssign = JimpleCodeGenerator.generateRefTypeAssignStmt(temp, refType);
-				Unit invoke = JimpleCodeGenerator.generateInvokeStmt(temp, initMethod, parameterLocals);
-				Unit assign = JimpleCodeGenerator.generateAssignStmt(refTypeLocal, temp);
+				Local temp = OldJimpleCodeGenerator.generateFreshLocal(body, refType);
+				Unit typeAssign = OldJimpleCodeGenerator.generateRefTypeAssignStmt(temp, refType);
+				Unit invoke = OldJimpleCodeGenerator.generateInvokeStmt(temp, initMethod, parameterLocals);
+				Unit assign = OldJimpleCodeGenerator.generateAssignStmt(refTypeLocal, temp);
 
 				List<Unit> units = Lists.newArrayList();
 				units.add(typeAssign);
@@ -538,7 +538,7 @@ public class JimpleCodeGenerator {
 		for (int i = 0; i < contentValues.size(); i++) {
 			Value index = IntConstant.v(i);
 			ArrayRef leftSide = Jimple.v().newArrayRef(arrayLocal, index);
-			Value rightSide = JimpleCodeGenerator.generateArrayUnit(body, contentValues.get(i), generatedUnits.get(arrayLocal));
+			Value rightSide = OldJimpleCodeGenerator.generateArrayUnit(body, contentValues.get(i), generatedUnits.get(arrayLocal));
 			Unit parameterInArray = Jimple.v().newAssignStmt(leftSide, rightSide);
 			generatedUnits.get(arrayLocal).add(generateAssignStmt(leftSide, rightSide));
 		}
