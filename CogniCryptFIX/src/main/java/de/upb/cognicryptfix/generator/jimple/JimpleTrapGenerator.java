@@ -128,7 +128,7 @@ public class JimpleTrapGenerator {
 			Local thrwoableTempLocal = localGenerator.generateFreshLocal(thrwoableRefType);
 			Unit caughtStmt = Jimple.v().newIdentityStmt(thrwoableTempLocal, Jimple.v().newCaughtExceptionRef());
 
-			Local thrwoableELocal = localGenerator.generateFreshLocal(thrwoableRefType, "e");
+			Local thrwoableELocal = localGenerator.generateFreshLocal(thrwoableRefType);
 			Unit localAssign = assignGenerator.generateAssignStmt(thrwoableELocal, thrwoableTempLocal);
 
 			RefType exceptionRefType = RefType.v(exceptions.get(i).getName());
