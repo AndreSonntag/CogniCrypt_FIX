@@ -22,7 +22,6 @@ import de.upb.cognicryptfix.patcher.patches.IncompleteOperationPatch;
 import de.upb.cognicryptfix.patcher.patches.NeverTypeOfPatch;
 import de.upb.cognicryptfix.patcher.patches.RequiredPredicatePatch;
 import de.upb.cognicryptfix.patcher.patches.TypeStatePatch;
-import soot.Body;
 import soot.SootClass;
 
 /**
@@ -36,36 +35,34 @@ public class JimplePatcher implements IPatcher{
 	public SootClass getPatchedClass(AbstractError error) {
 		SootClass errorClass = error.getErrorLocation().getMethod().getDeclaringClass();
 		try {
-			error.getErrorLocation().getMethod().setActiveBody(createPatch(error));
+			createPatch(error);
 		} catch (NotSupportedConstraintException | NotExpectedUnitException | UnsupportedDataTypeException e) {
 			e.printStackTrace();
 		}
 		return errorClass;
 	}	
 	
-	private Body createPatch(AbstractError error) throws NotSupportedConstraintException, NotExpectedUnitException, UnsupportedDataTypeException {
-		
-		printErrorInformation(error);
-		Body patchedJimpleBody = error.getErrorLocation().getMethod().getActiveBody();
+	private void createPatch(AbstractError error) throws NotSupportedConstraintException, NotExpectedUnitException, UnsupportedDataTypeException {
+//		printErrorInformation(error);
 		
 		if (error instanceof ConstraintError && !(((ConstraintError) error).getBrokenConstraint() instanceof CrySLPredicate)) {
 			ConstraintError conError = (ConstraintError) error;			
 			ConstraintPatch patch = new ConstraintPatch(conError);
-			patchedJimpleBody = patch.applyPatch();
+			patch.applyPatch();
 			logger.info(patch.toPatchString());			
 		}
 		else if (error instanceof ForbiddenMethodError) {
 			
 			ForbiddenMethodError fMethodError = (ForbiddenMethodError) error;			
 			ForbiddenMethodPatch patch = new ForbiddenMethodPatch(fMethodError);
-			patchedJimpleBody = patch.applyPatch();
+			patch.applyPatch();
 			logger.info(patch.toPatchString());			
 		}
 		else if (error instanceof NeverTypeOfError) {
 			
 			NeverTypeOfError nTypeError = (NeverTypeOfError) error;
 			NeverTypeOfPatch patch = new NeverTypeOfPatch(nTypeError);
-			patchedJimpleBody = patch.applyPatch();
+			patch.applyPatch();
 			logger.info(patch.toPatchString());			
 		}
 		else if(error instanceof TypestateError) {
@@ -86,11 +83,10 @@ public class JimplePatcher implements IPatcher{
 			
 			RequiredPredicateError reqPredicateErrpr = (RequiredPredicateError) error;
 			RequiredPredicatePatch patch = new RequiredPredicatePatch(reqPredicateErrpr);
-			patchedJimpleBody = patch.applyPatch();
+			patch.applyPatch();
 			logger.info(patch.toPatchString());			
 		}
 
-		return patchedJimpleBody;
 	}
 	
 	
