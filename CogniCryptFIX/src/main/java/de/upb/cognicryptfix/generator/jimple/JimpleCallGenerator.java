@@ -6,7 +6,7 @@ import java.util.Map;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
-import de.upb.cognicryptfix.utils.RequiredExceptionHandlingTag;
+import de.upb.cognicryptfix.tag.RequiredExceptionHandlingTag;
 import soot.Body;
 import soot.Local;
 import soot.SootMethod;
@@ -20,21 +20,11 @@ import soot.tagkit.Tag;
  */
 public class JimpleCallGenerator {
 
-	/*-
-	 * Cases:
-	 * A x = new A()
-	 * A x = A.getInstance();
-	 * x.init() 
-	 * K y = x.getKey();
-	 */
-
-	private Body body;
 	private JimpleLocalGenerator localGenerator;
 	private JimpleInvokeGenerator invokeGenerator;
 	private JimpleAssignGenerator assignGenerator;
 	
 	public JimpleCallGenerator(Body body) {
-		this.body = body;
 		this.localGenerator = new JimpleLocalGenerator(body);
 		this.invokeGenerator = new JimpleInvokeGenerator();
 		this.assignGenerator = new JimpleAssignGenerator();
@@ -46,10 +36,10 @@ public class JimpleCallGenerator {
 
 	public Map<Local, List<Unit>> generateCallUnits(Local var, Local returnVar, SootMethod method, Local... parameterLocals) {
 		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
-
+		
 		if (method.isConstructor()) { //init call
 			generatedUnits.putAll(generateConstructorCallUnits(var, method, parameterLocals));
-		} else if (var.getType() == method.getReturnType()) {// i.e. getInstance()
+		} else if (JimpleUtils.equals(var.getType(), method.getReturnType())) {// i.e. getInstance()
 			generatedUnits.putAll(generateSelfInitializeMethodCallUnits(var, method, parameterLocals));
 		} else if (returnVar == null) {
 			generatedUnits.putAll(generateVoidMethodCallUnits(var, method, parameterLocals));
@@ -91,7 +81,6 @@ public class JimpleCallGenerator {
 		return generatedUnits;
 	}
 
-	// REFATOR check necessary!!!!
 	public Map<Local, List<Unit>> generateSelfInitializeMethodCallUnits(Local var, SootMethod method, Local... parameterLocals) {
 		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 
