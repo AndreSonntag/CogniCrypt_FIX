@@ -1,5 +1,8 @@
 package de.upb.cognicryptfix;
 
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.commons.cli.CommandLine;
@@ -9,14 +12,16 @@ import org.apache.commons.cli.ParseException;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.config.ConfigurationSource;
 import org.apache.logging.log4j.core.config.Configurator;
 
-import crypto.rules.CrySLRule;
+import crypto.analysis.CryptoScanner;
 import de.upb.cognicryptfix.analysis.CryptoAnalysis;
 import de.upb.cognicryptfix.analysis.CryptoAnalysisListener;
-import de.upb.cognicryptfix.crysl.CrySLReaderUtils;
+import de.upb.cognicryptfix.scheduler.ErrorScheduler;
 import de.upb.cognicryptfix.utils.MavenProject;
 import de.upb.cognicryptfix.utils.Utils;
+import soot.options.Options;
 
 /**
  * @author Andre Sonntag
@@ -24,13 +29,13 @@ import de.upb.cognicryptfix.utils.Utils;
  */
 public class HeadlessRepairer {
 
-	private static final Logger logger = LogManager.getLogger(HeadlessRepairer.class.getSimpleName());
- 	private static CommandLine options;
- 	private static List<CrySLRule> rules;
- 	private static int repairRound = 0;
+	static {
+        readLoggingConfiguration();
+    }
 
-	public static void main(String... args) throws ParseException {
-		infoLogLevel();
+ 	private static CommandLine options;
+
+	public static void main(String... args) throws ParseException, InterruptedException {
 		
 		final CommandLineParser parser = new DefaultParser();
 		options = parser.parse(new HeadlessRepairerOptions(), args);
@@ -38,43 +43,23 @@ public class HeadlessRepairer {
 		final String rulesDirectory = options.hasOption("rulesDir") ? options.getOptionValue("rulesDir") : "rulesDirectory";
 		final String sootClassPath = options.hasOption("sootCp") ? options.getOptionValue("sootCp") : "sootClassPath";
 		final String applicationClassPath = options.hasOption("applicationCp") ? options.getOptionValue("applicationCp") : "applicationClassPath";
-
-		MavenProject analysingProject = Utils.createAndCompile(applicationClassPath);
-		rules = readRules();
+				
+		ErrorScheduler scheduler = ErrorScheduler.getInstance();
+		MavenProject analysingProject = Utils.createAndCompile(applicationClassPath);		
+		CryptoAnalysisListener reporter = new CryptoAnalysisListener(scheduler);	
+		AnalysisRepairThread repairThread = new AnalysisRepairThread(analysingProject, reporter);
+		repairThread.start();	
+		repairThread.join();
+	}
 		
-		CryptoAnalysis analysis = new CryptoAnalysis(rules);
-		CryptoAnalysisListener listener = new CryptoAnalysisListener();
-//		analysis.runSoot(analysingProject, listener);
-		analysis = new CryptoAnalysis(rules);
-		analysis.runSoot(Constants.jimpleOutputPath, listener);
-	}
-	
-	public static List<CrySLRule> getCrySLRules() {
-		if(rules.isEmpty()) {
-			rules = readRules();
+	private static void readLoggingConfiguration() {
+		ConfigurationSource source;
+		try {
+			source = new ConfigurationSource(new FileInputStream(Constants.log4j2XML_PATH));
+			Configurator.initialize(null, source);
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
-		return rules;
-	}
-	
-	public static int getRepairRound() {
-		return repairRound;
-	}
-	
-	public static int increaseRepairRound() {
-		return repairRound++;
-	}
-	
-	private static List<CrySLRule> readRules(){
-		return CrySLReaderUtils.readRulesFromSourceFiles(Constants.crySLRulePath);
-	}
-	
-	public static void infoLogLevel() {
-		setLoggerLevel(Level.INFO);	
-	}
-	
-	public static void setLoggerLevel(Level level) {
-		Configurator.setAllLevels(LogManager.getRootLogger().getName(), level);
-		logger.debug("Logger level: "+LogManager.getRootLogger().getLevel());
 	}
 
 }

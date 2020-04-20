@@ -2,14 +2,9 @@ package de.upb.cognicryptfix.analysis;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Table;
 
@@ -25,6 +20,7 @@ import crypto.analysis.IAnalysisSeed;
 import crypto.analysis.errors.AbstractError;
 import crypto.analysis.errors.ConstraintError;
 import crypto.analysis.errors.ForbiddenMethodError;
+import crypto.analysis.errors.HardCodedError;
 import crypto.analysis.errors.IncompleteOperationError;
 import crypto.analysis.errors.NeverTypeOfError;
 import crypto.analysis.errors.RequiredPredicateError;
@@ -34,9 +30,7 @@ import crypto.extractparameter.ExtractedValue;
 import crypto.interfaces.ISLConstraint;
 import crypto.rules.CrySLPredicate;
 import crypto.rules.CrySLRule;
-import de.upb.cognicryptfix.HeadlessRepairer;
-import de.upb.cognicryptfix.patcher.IPatcher;
-import de.upb.cognicryptfix.patcher.JimplePatcher;
+import de.upb.cognicryptfix.scheduler.ErrorScheduler;
 import sync.pds.solver.nodes.Node;
 import typestate.TransitionFunction;
 
@@ -47,34 +41,31 @@ import typestate.TransitionFunction;
  */
 public class CryptoAnalysisListener extends CrySLAnalysisListener{
 
-	private static final Logger logger = LogManager.getLogger(CryptoAnalysisListener.class.getSimpleName());
+	private ErrorScheduler scheduler;
 	private List<String> ruleClassNames;
 	private List<AbstractError> errors;
 	private List<AbstractError> fMethodError;
 	private List<AbstractError> nTypeOfError;
+	private List<AbstractError> hardCodedError;
 	private List<AbstractError> compValueError;
 	private List<AbstractError> incompleteError;
 	private List<AbstractError> reqPredicateError;
 	private List<AbstractError> typeStateError;
 	private List<AbstractError> ruleClassError;
+	private boolean underRepair;
 	
-	public CryptoAnalysisListener() {
-		errors = Lists.newArrayList();
-		fMethodError = Lists.newArrayList();
-		nTypeOfError = Lists.newArrayList();
-		compValueError = Lists.newArrayList();
-		incompleteError = Lists.newArrayList();
-		reqPredicateError = Lists.newArrayList();
-		typeStateError = Lists.newArrayList();
-		ruleClassError = Lists.newArrayList();
-		ruleClassNames = Lists.newArrayList();
-		
-		for(CrySLRule rule : HeadlessRepairer.getCrySLRules()) {
+	public CryptoAnalysisListener(ErrorScheduler scheduler) {
+		this.scheduler = scheduler;
+		underRepair = true;
+		init();		
+		ruleClassNames = Lists.newArrayList();		
+		for(CrySLRule rule : CryptoAnalysis.getCrySLRules()) {
 			ruleClassNames.add(rule.getClassName());
-		}
+		}	
 	}
 	
 	public void reportError(AbstractError error) {
+		
 		if(ruleClassNames.contains(error.getErrorLocation().getMethod().getDeclaringClass().toString())){
 			ruleClassError.add(error);
 		}	
@@ -83,6 +74,9 @@ public class CryptoAnalysisListener extends CrySLAnalysisListener{
 		}
 		else if(error instanceof NeverTypeOfError) {
 			nTypeOfError.add(error);
+		}
+		else if(error instanceof HardCodedError) {
+			hardCodedError.add(error);
 		}
 		else if(error instanceof TypestateError) {
 			typeStateError.add(error);
@@ -99,21 +93,34 @@ public class CryptoAnalysisListener extends CrySLAnalysisListener{
 	}
 	
 	public void afterAnalysis() {
-		
+		errors = Lists.newArrayList();
 		errors.addAll(compValueError);
 		errors.addAll(fMethodError);
 		errors.addAll(nTypeOfError);
+		errors.addAll(hardCodedError);
 		errors.addAll(typeStateError);
 		errors.addAll(incompleteError);
-		errors.addAll(reqPredicateError);
-		logger.info("DETECTED ERRORS: "+errors.size());
-		IPatcher patcher = new JimplePatcher();
-		for(AbstractError e : errors) {
-			patcher.getPatchedClass(e);
-		}		
+		errors.addAll(reqPredicateError);	
+		scheduler.addAll(errors);
+		underRepair = scheduler.run();
+		init();
 	}
 	
+	public boolean isUnderRepair() {
+		return underRepair;
+	}
 
+	private void init() {
+		this.fMethodError = Lists.newArrayList();
+		this.nTypeOfError = Lists.newArrayList();
+		this.compValueError = Lists.newArrayList();
+		this.incompleteError = Lists.newArrayList();
+		this.reqPredicateError = Lists.newArrayList();
+		this.typeStateError = Lists.newArrayList();
+		this.hardCodedError = Lists.newArrayList();
+		this.ruleClassError = Lists.newArrayList();
+	}
+	
 	public void afterConstraintCheck(AnalysisSeedWithSpecification arg0) {}
 
 	public void afterPredicateCheck(AnalysisSeedWithSpecification arg0) {}
