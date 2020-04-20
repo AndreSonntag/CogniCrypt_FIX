@@ -5,6 +5,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -12,14 +17,15 @@ import crypto.analysis.errors.ForbiddenMethodError;
 import de.upb.cognicryptfix.crysl.CrySLEntity;
 import de.upb.cognicryptfix.crysl.CrySLMethodCall;
 import de.upb.cognicryptfix.crysl.pool.CrySLEntityPool;
-import de.upb.cognicryptfix.exception.NoEnsuredPredicateException;
+import de.upb.cognicryptfix.exception.patch.RepairException;
+import de.upb.cognicryptfix.exception.path.NoCallFoundException;
 import de.upb.cognicryptfix.generator.JimpleCodeGeneratorByRule;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
 import de.upb.cognicryptfix.utils.InitializationMethodSorter;
-import de.upb.cognicryptfix.utils.Utils;
 import soot.Body;
 import soot.Local;
 import soot.SootMethod;
+import soot.Type;
 import soot.Unit;
 import soot.Value;
 import soot.ValueBox;
@@ -36,6 +42,7 @@ import soot.jimple.internal.JimpleLocalBox;
  */
 public class ForbiddenMethodPatch extends AbstractPatch {
 
+	private static final Logger LOGGER = LogManager.getLogger(ForbiddenMethodPatch.class);
 	private ForbiddenMethodError error;
 	
 	private CrySLEntity entity;
@@ -58,13 +65,12 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 	}
 
 	@Override
-	public Body applyPatch() {
-
+	public Body applyPatch() throws RepairException{
 		Unit forbiddenUnit = error.getErrorLocation().getUnit().get();
 		SootMethod forbiddenMethod = error.getCalledMethod();
 		ArrayList<SootMethod> alternativeMethods = new ArrayList<>(error.getAlternatives());
 
-		if (Utils.isNullOrEmpty(alternativeMethods)) {
+		if (CollectionUtils.isEmpty(alternativeMethods)) {
 			body.getUnits().remove(forbiddenUnit);
 		} else {
 			Collections.sort(alternativeMethods, new InitializationMethodSorter());
@@ -74,14 +80,22 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 		return body;
 	}
 
-	private void replaceForbiddenMethod(Unit forbiddenUnit, SootMethod forbiddenMethod, SootMethod alternativeMethod) {
+	private void replaceForbiddenMethod(Unit forbiddenUnit, SootMethod forbiddenMethod, SootMethod alternativeMethod) throws NoCallFoundException {
 
 		Map<Local, List<Unit>> generatedCallUnits = Maps.newLinkedHashMap();
 		Map<Local, List<Unit>> generatedParameterUnits = Maps.newLinkedHashMap();
 		CrySLMethodCall call = entity.getFSM().getCrySLMethodCallBySootMethod(alternativeMethod);
-
-		generatedParameterUnits = generator.generateParameters(call);
-		Local invokeLocal = JimpleUtils.getInvokeLocal(forbiddenUnit);
+		
+		Map<Integer, Local> parameterMatches = Maps.newHashMap();
+		parameterMatches = calcParameterMatches(forbiddenUnit, alternativeMethod); 
+		
+		if(MapUtils.isEmpty(parameterMatches)) {
+			generatedParameterUnits = generator.generateParameters(call);
+		} else {
+			generatedParameterUnits = generator.generateParameters(call, parameterMatches);
+		}
+		
+		Local invokeLocal = JimpleUtils.getInvokeLocal(forbiddenUnit);		
 		Local[] parameterLocals = generatedParameterUnits.keySet().toArray(new Local[0]);
 		generatedCallUnits = generator.generateCall(invokeLocal, call, true, parameterLocals);
 
@@ -103,7 +117,6 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 		if (!parameterUnits.isEmpty()) {
 			body.getUnits().insertBefore(parameterUnits, forbiddenUnit);
 		}
-		generator.generateTryCatchBlock(parameterUnits);		
 	}
 
 	private void insertAlternativeCallUnits(SootMethod forbiddenMethod, Unit forbiddenUnit,
@@ -116,8 +129,6 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 			}
 		}
 
-		// little workaroud because our code generator doesn't generate individual
-		// InvokeExpr
 		for (ValueBox box : alternativeInvokeExpr.getUseBoxes()) {
 			if (box instanceof JimpleLocalBox) {
 				box.setValue(JimpleUtils.getInvokeLocal(forbiddenUnit));
@@ -127,8 +138,6 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 
 		if (alternativeMethod.isConstructor()) {
 			if (forbiddenMethod.isConstructor()) {
-
-				// replace forbidden InvokeExpr by alternative InvokeExpr
 				if (forbiddenUnit instanceof AssignStmt) {
 					AssignStmt assign = (AssignStmt) forbiddenUnit;
 					assign.getRightOpBox().setValue((Value) alternativeInvokeExpr);
@@ -150,14 +159,37 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 				invoke.setInvokeExpr(alternativeInvokeExpr);
 			}
 		}
-		generator.generateTryCatchBlock(forbiddenUnit);		
 		patch = forbiddenUnit;
 	}
 
+	private Map<Integer, Local> calcParameterMatches(Unit forbiddenUnit, SootMethod alternativeMethod){
+		Map<Integer, Local> parameterMatchMap = Maps.newHashMap();
+		
+		if(JimpleUtils.containsInvokeExpr(forbiddenUnit)) {
+			InvokeExpr errorInvokeExpr = JimpleUtils.getInvokeExpr(forbiddenUnit);
+			
+			for(Value arg : errorInvokeExpr.getArgs()) {
+				int i = 0;
+				for(Type alterParams : alternativeMethod.getParameterTypes()) {
+					if(JimpleUtils.equals(arg.getType(), alterParams)) {
+						if(!parameterMatchMap.containsKey(i)) {
+							parameterMatchMap.put(i, (Local) arg);
+						} else {
+							continue;
+						}
+					}
+					i++;
+				}
+			}
+		}
+		return parameterMatchMap;
+	}
+	
+	
 	@Override
 	public String toPatchString() {
 		StringBuilder builder = new StringBuilder();
-		builder.append("\n------------------->--------------------ForbiddenMethodPatch---------------->------------------\n");
+		builder.append("\n__________[ForbiddenMethodPatch]__________\n");
 		builder.append("Class: \t\t"+error.getErrorLocation().getMethod().getDeclaringClass().toString()+"\n");
 		builder.append("Method: \t"+error.getErrorLocation().getMethod().getSignature()+"\n");
 		builder.append("Error: \t\t"+error.getClass().getSimpleName()+"\n");
@@ -170,7 +202,7 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 			builder.append(patch);
 		}
 		builder.append("\n");
-		builder.append("-----------------------------------------------------------------------------------------------\n");
+		builder.append("________________________________________\n");
 		return builder.toString();
 	}
 

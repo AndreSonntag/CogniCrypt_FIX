@@ -1,10 +1,11 @@
 package de.upb.cognicryptfix.patcher.patches;
 
+import de.upb.cognicryptfix.exception.patch.RepairException;
 import soot.Body;
 
 public abstract class AbstractPatch {
 	
-	public abstract Body applyPatch() throws Exception;
+	public abstract Body applyPatch() throws RepairException;
 	public abstract String toPatchString();
 	
 	/*-

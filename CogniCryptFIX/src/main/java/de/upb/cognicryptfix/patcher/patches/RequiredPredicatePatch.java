@@ -3,11 +3,15 @@ package de.upb.cognicryptfix.patcher.patches;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import crypto.analysis.errors.RequiredPredicateError;
 import de.upb.cognicryptfix.crysl.CrySLEntity;
 import de.upb.cognicryptfix.crysl.CrySLMethodCall;
 import de.upb.cognicryptfix.crysl.CrySLVariable;
 import de.upb.cognicryptfix.crysl.pool.CrySLEntityPool;
+import de.upb.cognicryptfix.exception.patch.RepairException;
 import de.upb.cognicryptfix.generator.JimpleCodeGeneratorByRule;
 import de.upb.cognicryptfix.utils.Utils;
 import soot.Body;
@@ -16,6 +20,8 @@ import soot.Unit;
 import soot.jimple.InvokeStmt;
 
 public class RequiredPredicatePatch extends AbstractPatch{
+	
+	private static final Logger LOGGER = LogManager.getLogger(RequiredPredicatePatch.class);
 	
 	private RequiredPredicateError error;
 	
@@ -37,7 +43,8 @@ public class RequiredPredicatePatch extends AbstractPatch{
 	}
 	
 	@Override
-	public Body applyPatch() {
+	public Body applyPatch() throws RepairException{
+		
 		InvokeStmt invokeStmt = (InvokeStmt) error.getErrorLocation().getUnit().get();
 		Local usageLocal = (Local) error.getExtractedValues().getCallSite().fact().value();		
 		CrySLMethodCall call = entity.getFSM().getCrySLMethodCallBySootMethod(invokeStmt.getInvokeExpr().getMethod());
@@ -50,24 +57,22 @@ public class RequiredPredicatePatch extends AbstractPatch{
 		if(!generatedUnits.isEmpty()) {
 			body.getUnits().insertBefore(generatedUnits, error.getErrorLocation().getUnit().get());
 		}
-		generator.generateTryCatchBlock(generatedUnits);		
 		return body;
 	}
 	
 	@Override
 	public String toPatchString() {
 		StringBuilder builder = new StringBuilder();
-		builder.append(
-				"\n------------------->--------------------RequiredPredicatePatch------------------>------------------\n");
+		builder.append("\n__________[RequiredPredicatePatch]__________\n");
 		builder.append("Class: \t\t" + error.getErrorLocation().getMethod().getDeclaringClass().toString() + "\n");
 		builder.append("Method: \t" + error.getErrorLocation().getMethod().getSignature() + "\n");
 		builder.append("Error: \t\t" + error.getClass().getSimpleName() + "\n");
 		builder.append("CrySLRule: \t" + entity.getRule().getClassName() + "\n");
 		builder.append("Message: \t" + error.toErrorMarkerString() + "\n");
 		builder.append("Patch:\t\t");
-		builder.append("generate "+error.getContradictedPredicate().getPredName()+"\n");
-		builder.append(
-				"-----------------------------------------------------------------------------------------------\n");
+		builder.append("generate "+error.getContradictedPredicate().getPredName());
+		builder.append("\n");
+		builder.append("________________________________________\n");
 		return builder.toString();
 	}
 

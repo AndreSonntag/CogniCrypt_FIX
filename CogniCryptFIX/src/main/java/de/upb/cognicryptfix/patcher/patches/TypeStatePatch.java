@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -16,6 +19,7 @@ import crypto.analysis.errors.TypestateError;
 import de.upb.cognicryptfix.crysl.CrySLEntity;
 import de.upb.cognicryptfix.crysl.CrySLMethodCall;
 import de.upb.cognicryptfix.crysl.pool.CrySLEntityPool;
+import de.upb.cognicryptfix.exception.patch.RepairException;
 import de.upb.cognicryptfix.generator.JimpleCodeGeneratorByRule;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
 import de.upb.cognicryptfix.utils.Utils;
@@ -27,6 +31,8 @@ import soot.jimple.InvokeExpr;
 
 public class TypeStatePatch extends AbstractPatch {
 
+	private static final Logger LOGGER = LogManager.getLogger(TypeStatePatch.class);
+	
 	private TypestateError error;
 
 	private CrySLEntity entity;
@@ -49,13 +55,10 @@ public class TypeStatePatch extends AbstractPatch {
 	}
 
 	@Override
-	public Body applyPatch() {
-
-		// TODO: check constructors
+	public Body applyPatch() throws RepairException{		
 		Unit errorUnit = error.getErrorLocation().getUnit().get();
 		Local errorLocal = null;
 		if (JimpleUtils.containsInvokeExpr(errorUnit)) {
-			InvokeExpr errorInvokeExpr = JimpleUtils.getInvokeExpr(errorUnit);
 			errorLocal = JimpleUtils.getInvokeLocal(errorUnit);
 		}
 
@@ -68,14 +71,12 @@ public class TypeStatePatch extends AbstractPatch {
 		Entry<Statement, SootMethod> errorUnitEntry = getEntryByUnit(errorUnit, orderedCallsOnObject);
 
 		if (hasExpectedCalls) {
-			List<Entry<Statement, SootMethod>> expectedMethodCallsEntrys = getEntrysBySootMethods(expectedSootMethods,
-					orderedCallsOnObject);
-			Entry<Statement, SootMethod> expectedMethodCallEntry = getClosestEntryForward(errorUnitEntry,
-					expectedMethodCallsEntrys, orderedCallsOnObject);
+			List<Entry<Statement, SootMethod>> expectedMethodCallsEntrys = getEntrysBySootMethods(expectedSootMethods, orderedCallsOnObject);
+			Entry<Statement, SootMethod> expectedMethodCallEntry = getClosestEntryForward(errorUnitEntry, expectedMethodCallsEntrys, orderedCallsOnObject);
 
 			if (expectedMethodCallEntry != null) {
 				Unit expectedMethodCallUnit = expectedMethodCallEntry.getKey().getUnit().get();
-				if (expectedMethodCallEntry.getKey().getMethod() == error.getErrorLocation().getMethod()) {
+				if (expectedMethodCallEntry.getKey().getMethod().getSignature() == error.getErrorLocation().getMethod().getSignature()) {
 					List<Unit> unitsToMove = getUnitsBetweenPoints(errorUnit, expectedMethodCallUnit);
 					unitsToMove.add(expectedMethodCallUnit);
 					body.getUnits().removeAll(unitsToMove);
@@ -91,7 +92,7 @@ public class TypeStatePatch extends AbstractPatch {
 					patch = Lists.newArrayList(expectedCall);
 				}
 			} else {
-				List<LinkedList<CrySLMethodCall>> pathsToFinalState = entity.getFSM().calcBestPathsToFinalStatesStartedByMultipleMethod(expectedSootMethods);
+				List<LinkedList<CrySLMethodCall>> pathsToFinalState = entity.getFSM().calcBestPathsToFinalStatesIncludeMultipleMethod(expectedSootMethods);
 				Map<Local, List<Unit>> generatedCallUnits = generator.generateCallWithParameter(errorLocal, pathsToFinalState.get(0).get(0), true);
 				List<Unit> units = Utils.summarizeUnitLists(generatedCallUnits.values());
 				body.getUnits().insertBefore(units, errorUnit);
@@ -101,7 +102,7 @@ public class TypeStatePatch extends AbstractPatch {
 		} else {
 			body.getUnits().remove(errorUnit);
 		}
-		generator.removeUnnecessaryTryCatchBlock();
+		generator.removeUnnecessaryTryCatchBlock();	
 		return body;
 	}
 
@@ -167,7 +168,7 @@ public class TypeStatePatch extends AbstractPatch {
 			Map<Entry<Statement, SootMethod>, Integer> orderedCallsOnObject) {
 		for (Entry<Statement, SootMethod> entry : orderedCallsOnObject.keySet()) {
 			SootMethod entryMethod = entry.getValue();
-			if (entryMethod == method) {
+			if (entryMethod.getSignature() == method.getSignature()) {
 				return entry;
 			}
 		}
@@ -201,7 +202,7 @@ public class TypeStatePatch extends AbstractPatch {
 	@Override
 	public String toPatchString() {
 		StringBuilder builder = new StringBuilder();
-		builder.append("\n------------------->--------------------TypeStatePatch---------------->------------------\n");
+		builder.append("\n__________[TypeStatePatch]__________\n");
 		builder.append("Class: \t\t" + error.getErrorLocation().getMethod().getDeclaringClass().toString() + "\n");
 		builder.append("Method: \t" + error.getErrorLocation().getMethod().getSignature() + "\n");
 		builder.append("Error: \t\t" + error.getClass().getSimpleName() + "\n");
@@ -221,8 +222,7 @@ public class TypeStatePatch extends AbstractPatch {
 			}
 		}
 		builder.append("\n");
-		builder.append(
-				"-----------------------------------------------------------------------------------------\n");
+		builder.append("________________________________________\n");
 		return builder.toString();
 	}
 
