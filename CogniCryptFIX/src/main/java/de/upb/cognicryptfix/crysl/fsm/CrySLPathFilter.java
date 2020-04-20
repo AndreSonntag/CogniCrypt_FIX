@@ -6,6 +6,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.collections4.CollectionUtils;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -16,6 +18,8 @@ import de.upb.cognicryptfix.crysl.CrySLMethodCallCriteria;
 import de.upb.cognicryptfix.crysl.CrySLPredicate;
 import de.upb.cognicryptfix.crysl.CrySLVariable;
 import de.upb.cognicryptfix.crysl.pool.CrySLEntityPool;
+import de.upb.cognicryptfix.exception.generation.crysl.EmptyPredicateListException;
+import de.upb.cognicryptfix.exception.path.EmptyPathListException;
 import de.upb.cognicryptfix.utils.Utils;
 import soot.RefType;
 import soot.Scene;
@@ -33,10 +37,10 @@ public class CrySLPathFilter {
 
 	private static CrySLEntityPool pool = CrySLEntityPool.getInstance();
 
-	public static List<LinkedList<CrySLMethodCall>> applyCriteriaFilters(List<LinkedList<CrySLMethodCall>> paths) {
-
-		if (Utils.isNullOrEmpty(paths)) {
-			return Lists.newArrayList();
+	public static List<LinkedList<CrySLMethodCall>> applyPathCriteriaFilters(List<LinkedList<CrySLMethodCall>> paths) throws EmptyPathListException {
+		
+		if (CollectionUtils.isEmpty(paths)) {
+			throw new EmptyPathListException("Path list is empty or null");
 		}
 
 		List<LinkedList<CrySLMethodCall>> filterPaths = Lists.newArrayList(paths);
@@ -46,14 +50,16 @@ public class CrySLPathFilter {
 		filterPaths = CrySLPathFilter.filterCallPathsByRefTypeRequiredPredicateRatio(filterPaths);
 		filterPaths = CrySLPathFilter.filterCallPathsByFewestUserInteractions(filterPaths);
 		filterPaths = CrySLPathFilter.filterCallPathsByFewestCalls(filterPaths);
-		filterPaths = CrySLPathFilter.filterCallPathsByPrefedCallsOfEntity(filterPaths);
+		filterPaths = CrySLPathFilter.filterCallPathsByPrefedCallsOfEntity(filterPaths);	
 		return filterPaths;
 	}
 	
 	
-	public static List<LinkedList<CrySLMethodCall>> filterCallPathsByPrefedCallsOfEntity( List<LinkedList<CrySLMethodCall>> paths) {
+	public static List<LinkedList<CrySLMethodCall>> filterCallPathsByPrefedCallsOfEntity(List<LinkedList<CrySLMethodCall>> paths) throws EmptyPathListException {
 		
-		if (paths.size() < 2) {
+		if (CollectionUtils.isEmpty(paths)) {
+			throw new EmptyPathListException("Path list is empty or null");
+		} else if(paths.size() == 1) {
 			return paths;
 		}
 
@@ -84,8 +90,14 @@ public class CrySLPathFilter {
 	}
 	
 
-	public static List<LinkedList<CrySLMethodCall>> filterCallPathsByUnsupportedPredicates(List<LinkedList<CrySLMethodCall>> paths) {
+	public static List<LinkedList<CrySLMethodCall>> filterCallPathsByUnsupportedPredicates(List<LinkedList<CrySLMethodCall>> paths) throws EmptyPathListException {
 
+		if (CollectionUtils.isEmpty(paths)) {
+			throw new EmptyPathListException("Path list is empty or null");
+		} else if(paths.size() == 1) {
+			return paths;
+		}
+		
 		List<LinkedList<CrySLMethodCall>> allowedPaths = Lists.newArrayList();
 		for (LinkedList<CrySLMethodCall> path : paths) {			
 			CrySLEntity entity = pool.getEntityByClassName(path.get(0).getRule().getClassName());
@@ -95,7 +107,7 @@ public class CrySLPathFilter {
 					List<CrySLPredicate> requiredPredicates = entity.getRequiredPredicateForVariableByType(parameter);
 					if (!requiredPredicates.isEmpty()) {
 						for (CrySLPredicate requiredPredicate : requiredPredicates) {
-							if (Constants.notSupportedPredicates.contains(requiredPredicate.getPredicateName())) {
+							if (Constants.NOT_SUPPORTED_PREDICATES.contains(requiredPredicate.getPredicateName())) {
 								unsupportedPredicate = true;
 							}
 						}
@@ -110,14 +122,20 @@ public class CrySLPathFilter {
 	}
 
 	public static List<LinkedList<CrySLMethodCall>> filterCallPathsByUnsupportedParameterTypes(
-			List<LinkedList<CrySLMethodCall>> paths) {
+			List<LinkedList<CrySLMethodCall>> paths) throws EmptyPathListException {
 
+		if (CollectionUtils.isEmpty(paths)) {
+			throw new EmptyPathListException("Path list is empty or null");
+		} else if(paths.size() == 1) {
+			return paths;
+		}
+		
 		List<LinkedList<CrySLMethodCall>> allowedPaths = Lists.newArrayList();
 		for (LinkedList<CrySLMethodCall> path : paths) {
 			boolean unsupportedParameterType = false;
 			for (CrySLMethodCall call : path) {
 				for (CrySLVariable parameter : call.getCallParameters()) {
-					if (Constants.notSupportedParameterTypes.contains(parameter.getType().toQuotedString())) {
+					if (Constants.NOT_SUPPORTED_PARAMETER_TYPES.contains(parameter.getType().toQuotedString())) {
 						unsupportedParameterType = true;
 					}
 
@@ -134,9 +152,11 @@ public class CrySLPathFilter {
 	}
 
 	public static List<LinkedList<CrySLMethodCall>> filterCallPathsByRefTypeRequiredPredicateRatio(
-			List<LinkedList<CrySLMethodCall>> paths) {
+			List<LinkedList<CrySLMethodCall>> paths) throws EmptyPathListException {
 
-		if (paths.size() < 2) {
+		if (CollectionUtils.isEmpty(paths)) {
+			throw new EmptyPathListException("Path list is empty or null");
+		} else if(paths.size() == 1) {
 			return paths;
 		}
 
@@ -182,9 +202,11 @@ public class CrySLPathFilter {
 	}
 
 	public static List<LinkedList<CrySLMethodCall>> filterCallPathsByFewestRequiredPredicates(
-			List<LinkedList<CrySLMethodCall>> paths) {
+			List<LinkedList<CrySLMethodCall>> paths) throws EmptyPathListException {
 
-		if (paths.size() < 2) {
+		if (CollectionUtils.isEmpty(paths)) {
+			throw new EmptyPathListException("Path list is empty or null");
+		} else if(paths.size() == 1) {
 			return paths;
 		}
 
@@ -192,9 +214,7 @@ public class CrySLPathFilter {
 		for (LinkedList<CrySLMethodCall> path : paths) {
 			CrySLEntity entity = pool.getEntityByClassName(path.get(0).getRule().getClassName());
 
-			boolean unsupportedPredicate = false;
 			int countRequiredPredicates = 0;
-
 			for (CrySLMethodCall call : path) {
 				for (CrySLVariable parameter : call.getCallParameters()) {
 					List<CrySLPredicate> requiredPredicates = entity.getRequiredPredicateForVariableByType(parameter);
@@ -218,9 +238,11 @@ public class CrySLPathFilter {
 	}
 
 	public static List<LinkedList<CrySLMethodCall>> filterCallPathsByFewestUserInteractions(
-			List<LinkedList<CrySLMethodCall>> paths) {
+			List<LinkedList<CrySLMethodCall>> paths) throws EmptyPathListException {
 
-		if (paths.size() < 2) {
+		if (CollectionUtils.isEmpty(paths)) {
+			throw new EmptyPathListException("Path list is empty or null");
+		} else if(paths.size() == 1) {
 			return paths;
 		}
 
@@ -246,9 +268,11 @@ public class CrySLPathFilter {
 	}
 
 	public static List<LinkedList<CrySLMethodCall>> filterCallPathsByFewestRefTypeGeneration(
-			List<LinkedList<CrySLMethodCall>> paths) {
+			List<LinkedList<CrySLMethodCall>> paths) throws EmptyPathListException {
 
-		if (paths.size() < 2) {
+		if (CollectionUtils.isEmpty(paths)) {
+			throw new EmptyPathListException("Path list is empty or null");
+		} else if(paths.size() == 1) {
 			return paths;
 		}
 
@@ -272,9 +296,16 @@ public class CrySLPathFilter {
 		return refTypeGenerationPathMap.get(fewestRefTypeGenerations);
 	}
 
+	//NO SUPER PRECISE
 	public static List<LinkedList<CrySLMethodCall>> filterCallPathsByUsedPredicateParameters(
-			List<LinkedList<CrySLMethodCall>> paths, List<CrySLVariable> predicatePramameters) {
+			List<LinkedList<CrySLMethodCall>> paths, List<CrySLVariable> predicatePramameters) throws EmptyPathListException {
 
+		if (CollectionUtils.isEmpty(paths)) {
+			throw new EmptyPathListException("Path list is empty or null");
+		} else if(paths.size() == 1) {
+			return paths;
+		}
+		
 		List<CrySLVariable> filteredPredicateParameters = Lists.newArrayList(predicatePramameters);
 		for (CrySLVariable parameter : filteredPredicateParameters) {
 			if (parameter.getName().equals("_")) {
@@ -308,11 +339,14 @@ public class CrySLPathFilter {
 		}
 		return usedPredicateParametersPathMap.get(filteredPredicateParameters.size());
 	}
-
+	
+	
 	public static List<LinkedList<CrySLMethodCall>> filterCallPathsByFewestCalls(
-			List<LinkedList<CrySLMethodCall>> paths) {
+			List<LinkedList<CrySLMethodCall>> paths) throws EmptyPathListException {
 
-		if (paths.size() < 2) {
+		if (CollectionUtils.isEmpty(paths)) {
+			throw new EmptyPathListException("Path list is empty or null");
+		} else if(paths.size() == 1) {
 			return paths;
 		}
 
@@ -333,8 +367,14 @@ public class CrySLPathFilter {
 	}
 
 	public static List<CrySLMethodCallTransition> filterTransitionsByFewestMethodCallUserInteractions(
-			Map<CrySLMethodCallCriteria, List<CrySLMethodCallTransition>> transitions) {
+			Map<CrySLMethodCallCriteria, List<CrySLMethodCallTransition>> transitions) throws EmptyPathListException {
 
+		if (transitions == null || transitions.isEmpty()) {
+			throw new EmptyPathListException("Path list is empty or null");
+		} else if(transitions.keySet().size() == 1) {
+			return transitions.values().iterator().next();
+		}
+		
 		if (transitions.keySet().size() < 2) {
 			return transitions.values().iterator().next();
 		}
@@ -349,9 +389,11 @@ public class CrySLPathFilter {
 	}
 
 	public static List<CrySLMethodCallTransition> filterTransitionsByFewestRefTypeGenerations(
-			Map<CrySLMethodCallCriteria, List<CrySLMethodCallTransition>> transitions) {
+			Map<CrySLMethodCallCriteria, List<CrySLMethodCallTransition>> transitions) throws EmptyPathListException {
 
-		if (transitions.keySet().size() < 2) {
+		if (transitions == null || transitions.isEmpty()) {
+			throw new EmptyPathListException("Path list is empty or null");
+		} else if(transitions.keySet().size() == 1) {
 			return transitions.values().iterator().next();
 		}
 

@@ -6,25 +6,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.Map.Entry;
+import java.util.Set;
+
+import org.apache.commons.collections4.CollectionUtils;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 import de.upb.cognicryptfix.crysl.fsm.CrySLPathFilter;
-import de.upb.cognicryptfix.exception.NoEnsuredPredicateException;
+import de.upb.cognicryptfix.exception.generation.crysl.EmptyPredicateListException;
+import de.upb.cognicryptfix.exception.generation.crysl.NoPredicateEnsurerException;
+import de.upb.cognicryptfix.exception.path.EmptyPathListException;
+import de.upb.cognicryptfix.exception.path.PathException;
 import de.upb.cognicryptfix.utils.Utils;
 
 public class CrySLPredicateFilter {
 
-	public static Entry<CrySLPredicate, LinkedList<CrySLMethodCall>> applyFilters(List<CrySLPredicate> predicates) throws NoEnsuredPredicateException {
+	public static Entry<CrySLPredicate, LinkedList<CrySLMethodCall>> applyFilters(List<CrySLPredicate> predicates) throws EmptyPredicateListException, PathException {
 		
-		if (Utils.isNullOrEmpty(predicates)) {
-			throw new NoEnsuredPredicateException();
+		if (CollectionUtils.isEmpty(predicates)) {
+			throw new EmptyPredicateListException("Predicate list is empty");
 		} 
 		
 		Map<CrySLPredicate, List<LinkedList<CrySLMethodCall>>> predicatePathsMap = createPredicatePathsMap(predicates);
 		List<LinkedList<CrySLMethodCall>> values = summarizeValuesToList(predicatePathsMap.values());
-		List<LinkedList<CrySLMethodCall>> filterdPaths = CrySLPathFilter.applyCriteriaFilters(values);
+		List<LinkedList<CrySLMethodCall>> filterdPaths = CrySLPathFilter.applyPathCriteriaFilters(values);
 		
 		for(CrySLPredicate predicate : predicatePathsMap.keySet()) {
 			List<LinkedList<CrySLMethodCall>> predicatePaths = predicatePathsMap.get(predicate);
@@ -35,8 +42,44 @@ public class CrySLPredicateFilter {
 		
 		return null;
 	}
+	
+	
+	public static List<CrySLPredicate> filterPredicatesByPathWihtoutUseOfSpecifiedPredicate(CrySLPredicate spec, List<CrySLPredicate> predicates) throws EmptyPredicateListException, PathException{
 		
-	private static Map<CrySLPredicate, List<LinkedList<CrySLMethodCall>>> createPredicatePathsMap(List<CrySLPredicate> predicates) {
+		if (CollectionUtils.isEmpty(predicates)) {
+			throw new EmptyPredicateListException("Predicate list is empty");
+		} 
+		
+		List<CrySLPredicate> interfaceProducer = Lists.newArrayList();
+		for(CrySLPredicate predicate : predicates) {
+			if(predicate.getProducer().isInterfaceOrAbstract()) {
+				interfaceProducer.add(predicate);
+			}
+		}
+		
+		predicates.removeAll(interfaceProducer);
+		Map<CrySLPredicate, List<LinkedList<CrySLMethodCall>>> predicatePathsMap = createPredicatePathsMap(predicates);
+		List<LinkedList<CrySLMethodCall>> paths = summarizeValuesToList(predicatePathsMap.values());
+		List<LinkedList<CrySLMethodCall>> pathWithUseOfSpecPred = CrySLPathFilter.filterCallPathsByUsedPredicateParameters(paths, spec.getPredicateParameters());
+		pathWithUseOfSpecPred.retainAll(paths);
+		paths.removeAll(pathWithUseOfSpecPred);
+
+		Set<CrySLPredicate> filteredPredicates = Sets.newHashSet();
+		for(CrySLPredicate predicate : predicatePathsMap.keySet()) {
+			List<LinkedList<CrySLMethodCall>> predicatePaths = predicatePathsMap.get(predicate);
+			for(LinkedList<CrySLMethodCall> path : paths) {
+				if(predicatePaths.contains(path)) {
+					filteredPredicates.add(predicate);
+					continue;
+				}
+			}
+		}
+		
+		return Lists.newArrayList(filteredPredicates);
+	}
+	
+	
+	private static Map<CrySLPredicate, List<LinkedList<CrySLMethodCall>>> createPredicatePathsMap(List<CrySLPredicate> predicates) throws PathException {
 		Map<CrySLPredicate, List<LinkedList<CrySLMethodCall>>> predicatePathsMap = Maps.newHashMap();
 		for (CrySLPredicate predicate : predicates) {
 			predicatePathsMap.put(predicate, predicate.getPaths());

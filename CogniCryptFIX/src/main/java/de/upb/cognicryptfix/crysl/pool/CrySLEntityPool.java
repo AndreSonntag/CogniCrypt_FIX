@@ -12,12 +12,11 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 import crypto.rules.CrySLRule;
-import de.upb.cognicryptfix.HeadlessRepairer;
+import de.upb.cognicryptfix.analysis.CryptoAnalysis;
 import de.upb.cognicryptfix.crysl.CrySLEntity;
 import de.upb.cognicryptfix.crysl.CrySLPredicate;
 import de.upb.cognicryptfix.crysl.CrySLVariable;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
-import de.upb.cognicryptfix.patcher.JimplePatcher;
 import de.upb.cognicryptfix.utils.Utils;
 import soot.Type;
 
@@ -32,7 +31,7 @@ public class CrySLEntityPool {
 
 
 	private CrySLEntityPool() {
-		this.rules = HeadlessRepairer.getCrySLRules();
+		this.rules = CryptoAnalysis.getCrySLRules();
 		this.entities = Lists.newArrayList();
 		this.predicates = Lists.newArrayList();
 		this.classNameCrySLEntityMap = Maps.newHashMap();
@@ -77,31 +76,18 @@ public class CrySLEntityPool {
 		return classNameCrySLEntityMap.get(className);
 	}
 	
-	public List<CrySLPredicate> getPossiblePredicateCandidatesForType(Type type) {
-		
-		if(!existPossiblePredicateCandidate(type)) {
-			return Lists.newArrayList();
-		}
-		
+	public List<CrySLPredicate> getPredicateCandidatesWhichProduceType(Type type) {
 		List<CrySLPredicate> candidates = Lists.newArrayList();
-		
+
 		for(CrySLPredicate predicate : predicates) {
 			CrySLVariable firstPredicateParameter = predicate.getPredicateParameters().get(0);
-			if (JimpleUtils.isEqualOrSubClassOrSubInterface(type, firstPredicateParameter.getType())) {
+			if (JimpleUtils.isSubClassOrImplementer(type, firstPredicateParameter.getType())) {
 				candidates.add(predicate);
 			}
 		}
 		return candidates;
 	}
 	
-	private boolean existPossiblePredicateCandidate(Type type) {
-		for(String name : classNameCrySLEntityMap.keySet()) {
-			if(type.toQuotedString().equals(name)) {
-				return true;
-			}
-		}
-		return false;
-	}
 
 	public List<CrySLPredicate> getPredicates() {
 		return predicates;

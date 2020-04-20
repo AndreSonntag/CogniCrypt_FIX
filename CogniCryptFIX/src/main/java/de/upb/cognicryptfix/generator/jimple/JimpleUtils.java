@@ -1,8 +1,8 @@
 package de.upb.cognicryptfix.generator.jimple;
 
-import java.math.BigInteger;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -10,8 +10,11 @@ import java.util.Map.Entry;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
+import crypto.extractparameter.CallSiteWithExtractedValue;
+import crypto.extractparameter.CallSiteWithParamIndex;
+import crypto.extractparameter.ExtractedValue;
 import de.upb.cognicryptfix.Constants;
-import de.upb.cognicryptfix.exception.NoImplementerException;
+import de.upb.cognicryptfix.exception.generation.NoInterfaceImplementerException;
 import de.upb.cognicryptfix.utils.ByteConstant;
 import de.upb.cognicryptfix.utils.InitializationMethodSorter;
 import soot.Body;
@@ -24,6 +27,7 @@ import soot.Hierarchy;
 import soot.IntType;
 import soot.Local;
 import soot.LongType;
+import soot.PackManager;
 import soot.PrimType;
 import soot.RefType;
 import soot.Scene;
@@ -43,6 +47,12 @@ import soot.jimple.LongConstant;
 import soot.jimple.NullConstant;
 import soot.jimple.StringConstant;
 import soot.jimple.internal.JimpleLocalBox;
+import soot.jimple.toolkits.base.Aggregator;
+import soot.jimple.toolkits.scalar.DeadAssignmentEliminator;
+import soot.jimple.toolkits.scalar.IdentityCastEliminator;
+import soot.jimple.toolkits.scalar.UnreachableCodeEliminator;
+import soot.toolkits.scalar.LocalPacker;
+import soot.toolkits.scalar.UnusedLocalEliminator;
 
 /**
  * @author Andre Sonntag
@@ -62,7 +72,7 @@ public class JimpleUtils {
 		Local local = body.getLocals().stream().filter(x -> name.equals(x.getName())).findAny().orElse(null);
 		return local;
 	}
-
+	
 	public static Local getInvokeLocal(Unit u) {
 		Local invokeLocal = null;
 
@@ -124,29 +134,43 @@ public class JimpleUtils {
 		return invokeExpr;
 	}
 
+	
+	
+	
+	public static boolean equals(Type a, Type b) {
+		
+		if(a.getNumber() == b.getNumber()) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+	
+	
+	
 	public static Constant generateDummyConstantValue(Type type) {
 
 		Type objType = Scene.v().getType("java.lang.Object");
 		Type charType = Scene.v().getType("java.lang.Character");
 
-		if (type instanceof PrimType || type == Scene.v().getType("java.lang.String")) {
+		if (type instanceof PrimType || equals(type, Scene.v().getType("java.lang.String"))) {
 			if (type == objType) {
 				return generateConstantValue(new Object());
-			} else if (type == BooleanType.v()) {
+			} else if (equals(type, BooleanType.v())) {
 				return generateConstantValue(true);
-			} else if (type == IntType.v()) {
+			} else if (equals(type, IntType.v())) {
 				return generateConstantValue(1);
-			} else if (type == DoubleType.v()) {
+			} else if (equals(type, DoubleType.v())) {
 				return generateConstantValue(1.0);
-			} else if (type == LongType.v()) {
+			} else if (equals(type, LongType.v())) {
 				return generateConstantValue(1L);
-			} else if (type == ShortType.v()) {
+			} else if (equals(type, ShortType.v())) {
 				return generateConstantValue(1);
-			} else if (type == ByteType.v()) {
+			} else if (equals(type, ByteType.v())) {
 				return generateConstantValue((byte) 1);
-			} else if (type == charType) {
+			} else if (equals(type, charType)) {
 				return generateConstantValue('c');
-			} else if (type == Scene.v().getType("java.lang.String")) {
+			} else if (equals(type, Scene.v().getType("java.lang.String"))) {
 				return generateConstantValue("");
 			} else {
 				throw new RuntimeException("error");
@@ -156,23 +180,23 @@ public class JimpleUtils {
 	}
 
 	public static Constant generateConstantValue(Type type, String object) {
-		if (type == Scene.v().getType("java.lang.String")) {
+		if (equals(type, Scene.v().getType("java.lang.String"))) {
 			return generateConstantValue(object);
-		} else if (type == Scene.v().getType("java.lang.String[]")) {
+		} else if (equals(type, Scene.v().getType("java.lang.String[]"))) {
 			return generateConstantValue(object);
-		} else if (type == BooleanType.v()) {
+		} else if (equals(type, BooleanType.v())) {
 			return generateConstantValue(Boolean.parseBoolean(object));
-		} else if (type == IntType.v()) {
+		} else if (equals(type, IntType.v())) {
 			return generateConstantValue(Integer.parseInt(object));
-		} else if (type == DoubleType.v()) {
+		} else if (equals(type, DoubleType.v())) {
 			return generateConstantValue(Double.parseDouble(object));
-		} else if (type == LongType.v()) {
+		} else if (equals(type, LongType.v())) {
 			return generateConstantValue(Long.parseLong(object));
-		} else if (type == ShortType.v()) {
+		} else if (equals(type, ShortType.v())) {
 			return generateConstantValue(Short.parseShort(object));
-		} else if (type == FloatType.v()) {
+		} else if (equals(type, FloatType.v())) {
 			return generateConstantValue(Float.parseFloat(object));
-		} else if (type == ByteType.v()) {
+		} else if (equals(type, ByteType.v())) {
 			return generateConstantValue(Byte.parseByte(object));
 		} else {
 			throw new RuntimeException("unrecognized constant value = " + object);
@@ -198,7 +222,7 @@ public class JimpleUtils {
 		} else if (object instanceof Short) {
 			return LongConstant.v(((Short) object).shortValue());
 		} else if (object instanceof Character) {
-			return StringConstant.v(object + "");
+			return IntConstant.v(((Integer) object).intValue());
 		} else if (object instanceof String) {
 			return StringConstant.v((String) object);
 		} else if (object instanceof Double) {
@@ -208,14 +232,12 @@ public class JimpleUtils {
 		}
 	}
 
-	public static boolean isEqualOrSubClassOrSubInterface(Type type, Type toCheck) {
+	public static boolean isSubClassOrImplementer(Type type, Type toCheck) {
 
 		SootClass superClass = Scene.v().loadClassAndSupport(type.toQuotedString());
 		SootClass subClass = Scene.v().loadClassAndSupport(toCheck.toQuotedString());
 
-		if (type == toCheck) {
-			return true;
-		} else if (getFastHierarchy().getAllSubinterfaces(superClass).contains(subClass)
+		if (getFastHierarchy().getAllSubinterfaces(superClass).contains(subClass)
 				|| getFastHierarchy().getSubclassesOf(superClass).contains(subClass)
 				|| getFastHierarchy().getAllImplementersOfInterface(superClass).contains(subClass)) {
 			return true;
@@ -225,27 +247,33 @@ public class JimpleUtils {
 	}
 
 	public static boolean isHighestSuperCryptoInterfaceOrAbstractClass(Type type) {
-		
+
 		if (type instanceof RefType) {
 			RefType refType = (RefType) type;
 			SootClass refTypeClazz = refType.getSootClass();
 
 			if (refTypeClazz.isInterface()) {
-				List<SootClass> superInterfaces = getHierarchy().getSuperinterfacesOf(refTypeClazz);
+				Hierarchy hrchy = getHierarchy();
+				List<SootClass> superInterfaces = Lists.newArrayList();
+				try {
+					superInterfaces = hrchy.getSuperinterfacesOf(refTypeClazz);
+				} catch(NullPointerException np) {
+					return false;
+				}
 				for (SootClass superInterface : superInterfaces) {
 					String packagePath = superInterface.getPackageName();
-					if (packagePath.contains("java.security") || packagePath.contains("javax.crypto")) {
+					if (packagePath.contains("java.security") || packagePath.contains("javax.crypto") || packagePath.contains("javax.net.ssl")) {
 						return false;
-					} 
+					}
 				}
 				return true;
 			} else if (refTypeClazz.isAbstract()) {
 				List<SootClass> superAbstractClasses = getHierarchy().getSuperclassesOf(refTypeClazz);
 				for (SootClass superClasses : superAbstractClasses) {
 					String packagePath = superClasses.getPackageName();
-					if (packagePath.contains("java.security") || packagePath.contains("javax.crypto")) {
+					if (packagePath.contains("java.security") || packagePath.contains("javax.crypto") || packagePath.contains("javax.net.ssl")) {
 						return false;
-					} 
+					}
 				}
 				return true;
 			} else {
@@ -256,12 +284,11 @@ public class JimpleUtils {
 		}
 	}
 
-	public static Entry<SootClass, SootMethod> getImplementingClassAndInitMethod(SootClass clazz)
-			throws NoImplementerException {
+	public static Entry<SootClass, SootMethod> getImplementingClassAndInitMethod(SootClass clazz) throws NoInterfaceImplementerException {
 
 		if (clazz.isConcrete()) {
 			SootMethod init = getBestInitializationMethod(clazz);
-			return new SimpleEntry(clazz, init);
+			return new SimpleEntry<SootClass, SootMethod>(clazz, init);
 		} else if (clazz.isInterface() || clazz.isAbstract()) {
 			List<SootClass> clazzCandidates = getImplementedInterfaceOrAbstractClass(clazz);
 
@@ -286,16 +313,16 @@ public class JimpleUtils {
 					}
 				}
 				return new SimpleEntry<SootClass, SootMethod>(winner, classInitMethodMap.get(winner));
-			} else {				
+			} else {
 				SootMethod init = getBestInitializationMethod(clazz);
-				if(init != null) {
+				if (init != null) {
 					return new SimpleEntry<SootClass, SootMethod>(clazz, init);
 				} else {
-					throw new NoImplementerException(clazz.getName());
+					throw new NoInterfaceImplementerException(clazz.getName());
 				}
 			}
 		} else {
-			throw new NoImplementerException(clazz.getName());
+			throw new NoInterfaceImplementerException("No Class or Method found to instanciated following class "+clazz.getName());
 		}
 	}
 
@@ -319,13 +346,12 @@ public class JimpleUtils {
 	}
 
 	private static SootMethod getBestInitializationMethod(SootClass clazz) {
-
 		List<SootMethod> initMethods = Lists.newArrayList();
 		for (SootMethod method : clazz.getMethods()) {
 			if ((method.isConstructor() || method.getName().contains("getInstance")) && method.isPublic() && !method.isAbstract()) {
 				boolean useOfNotSupportedType = false;
 				for (Type parameterType : method.getParameterTypes()) {
-					if (Constants.notSupportedParameterTypes.contains(parameterType.toQuotedString())) {
+					if (Constants.NOT_SUPPORTED_PARAMETER_TYPES.contains(parameterType.toQuotedString())) {
 						useOfNotSupportedType = true;
 					}
 				}
@@ -337,5 +363,4 @@ public class JimpleUtils {
 		Collections.sort(initMethods, new InitializationMethodSorter());
 		return initMethods.isEmpty() ? null : initMethods.get(0);
 	}
-
 }

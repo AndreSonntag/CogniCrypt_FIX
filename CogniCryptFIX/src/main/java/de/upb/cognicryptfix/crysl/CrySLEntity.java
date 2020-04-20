@@ -15,7 +15,7 @@ import crypto.rules.CrySLValueConstraint;
 import de.upb.cognicryptfix.crysl.fsm.CrySLCallFSM;
 import de.upb.cognicryptfix.crysl.pool.CrySLEntityPool;
 import de.upb.cognicryptfix.crysl.pool.CrySLVariablePool;
-import de.upb.cognicryptfix.exception.NoImplementerException;
+import de.upb.cognicryptfix.exception.generation.NoInterfaceImplementerException;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
 import soot.Scene;
 import soot.SootClass;
@@ -54,6 +54,59 @@ public class CrySLEntity {
 			} else {
 				CrySLPredicate negatedPredicate = new CrySLPredicate(predicate, this);
 				negatedPredicates.add(negatedPredicate);
+			}
+		}
+	}
+	
+	public void addRequiredPredicate(CrySLVariable var, CrySLPredicate predicate) {
+		requiredPredicates.add(predicate);
+		if (variableRequiredPredicateMap.containsKey(var)) {
+			variableRequiredPredicateMap.get(var).add(predicate);
+		} else {
+			List<CrySLPredicate> requiredPredicateList = Lists.newArrayList();
+			requiredPredicateList.add(predicate);
+			variableRequiredPredicateMap.put(var, requiredPredicateList);
+		}
+	}
+
+	public boolean requiresPredicate(CrySLVariable variable) {
+		if (variableRequiredPredicateMap.get(variable) == null) {
+			return false;
+		} else {
+			return true;
+		}
+	}
+	
+	public List<CrySLPredicate> getRequiredPredicateForVariableByType(CrySLVariable variable) {	
+		
+		if (variableRequiredPredicateMap.get(variable) == null) {
+			return Lists.newArrayList();
+		} else {
+			List<CrySLPredicate> firstChoice = Lists.newArrayList();
+			List<CrySLPredicate> secondChoice = Lists.newArrayList();
+			
+			List<CrySLPredicate> calcPredicates = calcRequiredPredicatesBySatisfiedConstraints(variable);
+			
+			for (CrySLPredicate predicate : Lists.newArrayList(calcPredicates)) {
+				Type firstPredicateParameterType = predicate.getPredicateParameters().get(0).getType();
+								
+				if(JimpleUtils.equals(variable.getType(), firstPredicateParameterType)) {
+					firstChoice.add(predicate);
+				} else if(JimpleUtils.isSubClassOrImplementer(variable.getType(),firstPredicateParameterType)) {
+					secondChoice.add(predicate);
+				} 
+			}
+
+			if(JimpleUtils.isHighestSuperCryptoInterfaceOrAbstractClass(variable.getType())) {
+				return secondChoice;
+			} else {
+				if(!firstChoice.isEmpty()) {
+					return firstChoice;
+				} else if (!secondChoice.isEmpty()) {
+					return secondChoice;
+				} else {
+					return Lists.newArrayList();
+				}			
 			}
 		}
 	}
@@ -101,59 +154,33 @@ public class CrySLEntity {
 			return Lists.newArrayList(variableRequiredPredicateMap.get(var));
 	
 	}
-
-	public void addRequiredPredicate(CrySLVariable var, CrySLPredicate predicate) {
-		requiredPredicates.add(predicate);
-		if (variableRequiredPredicateMap.containsKey(var)) {
-			variableRequiredPredicateMap.get(var).add(predicate);
-		} else {
-			List<CrySLPredicate> requiredPredicateList = Lists.newArrayList();
-			requiredPredicateList.add(predicate);
-			variableRequiredPredicateMap.put(var, requiredPredicateList);
+	
+	//TODO: rename!
+	public List<CrySLPredicate> canProducedByPredicates(){
+		List<CrySLPredicate> producerPredicates= Lists.newArrayList();
+		if(isInterfaceOrAbstract()) {
+			List<CrySLPredicate> predicates = CrySLEntityPool.getInstance().getPredicateCandidatesWhichProduceType(clazz.getType());
+			if (!predicates.isEmpty()) {
+				producerPredicates = predicates;
+			}
 		}
+		return producerPredicates;
 	}
 
-	public boolean requiresPredicate(CrySLVariable variable) {
-		if (variableRequiredPredicateMap.get(variable) == null) {
-			return false;
-		} else {
+	public boolean isInterfaceOrAbstract() {
+		if(clazz.isInterface()){
 			return true;
+		} else if(clazz.isAbstract()) {
+			try {
+				return JimpleUtils.getImplementingClassAndInitMethod(clazz) != null ? false : true;
+			} catch (NoInterfaceImplementerException e) {
+				return true;
+			}
+		} else {
+			return false;
 		}
 	}
 	
-	public List<CrySLPredicate> getRequiredPredicateForVariableByType(CrySLVariable variable) {		
-		if (variableRequiredPredicateMap.get(variable) == null) {
-			return Lists.newArrayList();
-		} else {
-			
-			List<CrySLPredicate> firstChoice = Lists.newArrayList();
-			List<CrySLPredicate> secondChoice = Lists.newArrayList();
-			
-			List<CrySLPredicate> calcPredicates = calcRequiredPredicatesBySatisfiedConstraints(variable);
-			for (CrySLPredicate predicate : Lists.newArrayList(calcPredicates)) {
-				Type firstPredicateParameterType = predicate.getPredicateParameters().get(0).getType();
-								
-				if(variable.getType() == firstPredicateParameterType) {
-					firstChoice.add(predicate);
-				} else if(JimpleUtils.isEqualOrSubClassOrSubInterface(variable.getType(),firstPredicateParameterType)) {
-					secondChoice.add(predicate);
-				} 
-			}
-
-			if(JimpleUtils.isHighestSuperCryptoInterfaceOrAbstractClass(variable.getType())) {
-				return secondChoice;
-			} else {
-				if(!firstChoice.isEmpty()) {
-					return firstChoice;
-				} else if (!secondChoice.isEmpty()) {
-					return secondChoice;
-				} else {
-					return Lists.newArrayList();
-				}			
-			}
-		}
-	}
-
 	public CrySLRule getRule() {
 		return rule;
 	}
@@ -177,38 +204,13 @@ public class CrySLEntity {
 	public SootClass getSootClass() {
 		return clazz;
 	}
-	
-	public boolean isInterfaceOrAbstract() {
-		if(clazz.isInterface()){
-			return true;
-		} else if(clazz.isAbstract()) {
-			try {
-				return JimpleUtils.getImplementingClassAndInitMethod(clazz) != null ? false : true;
-			} catch (NoImplementerException e) {
-				return true;
-			}
-		} else {
-			return false;
-		}
-	}
-	
+		
 	public CrySLVariable getVariableByName(String name) {
 		return pool.getVariableByName(name);
 	}
 	
 	public List<CrySLPredicate> getNegatedPredicates() {
 		return negatedPredicates;
-	}
-
-	public List<CrySLPredicate> canProducedByPredicates(){
-		List<CrySLPredicate> producerPredicates= Lists.newArrayList();
-		if(isInterfaceOrAbstract()) {
-			List<CrySLPredicate> predicates = CrySLEntityPool.getInstance().getPossiblePredicateCandidatesForType(clazz.getType());
-			if (!predicates.isEmpty()) {
-				producerPredicates = predicates;
-			}
-		}
-		return producerPredicates;
 	}
 
 	@Override

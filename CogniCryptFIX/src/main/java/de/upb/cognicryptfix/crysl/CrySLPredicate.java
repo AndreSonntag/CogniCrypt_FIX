@@ -4,12 +4,16 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.collections4.CollectionUtils;
+
 import com.google.common.collect.Lists;
 
 import crypto.interfaces.ICrySLPredicateParameter;
 import crypto.rules.CrySLCondPredicate;
 import crypto.rules.CrySLObject;
 import crypto.rules.StateNode;
+import de.upb.cognicryptfix.exception.path.NoPathException;
+import de.upb.cognicryptfix.exception.path.PathException;
 import de.upb.cognicryptfix.utils.Utils;
 import soot.Scene;
 import soot.Type;
@@ -32,7 +36,7 @@ public class CrySLPredicate {
 		this.negated = predicate_.isNegated(); 
 	}
 
-	public List<LinkedList<CrySLMethodCall>> getPaths(){
+	public List<LinkedList<CrySLMethodCall>> getPaths() throws PathException{
 		if (generationPaths.isEmpty()) {
 			generationPaths = calcPaths();
 		}
@@ -40,18 +44,22 @@ public class CrySLPredicate {
 		return generationPaths;
 	}
 
-	private List<LinkedList<CrySLMethodCall>> calcPaths() {
+	private List<LinkedList<CrySLMethodCall>> calcPaths() throws PathException {
+		List<LinkedList<CrySLMethodCall>> paths = Lists.newArrayList();
+		
 		if (predicate_ instanceof CrySLCondPredicate) {
 			CrySLCondPredicate conPred = (CrySLCondPredicate) predicate_;
 			Set<StateNode> afterStates = conPred.getConditionalMethods();
-			List<LinkedList<CrySLMethodCall>> paths = producer.getFSM()
-					.calcBestPathsForPredicateGenerationFromState(afterStates.iterator().next(), predicateParameters);
-			return paths;
+			paths = producer.getFSM().calcBestPathsForPredicateGenerationFromState(afterStates.iterator().next(), predicateParameters);
 		} else {
-			List<LinkedList<CrySLMethodCall>> paths = producer.getFSM()
-					.calcBestPathsForPredicateGenerationFromFinalStates(predicateParameters);
-			return paths;
+			paths = producer.getFSM().calcBestPathsForPredicateGenerationFromFinalStates(predicateParameters);
+		
 		}
+		
+		if(CollectionUtils.isEmpty(paths)) {
+			throw new NoPathException("No path could be calculated for "+toString());
+		}
+		return paths;
 	}
 
 	private List<CrySLVariable> extractPredicateParameters() {
