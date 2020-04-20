@@ -9,4 +9,6 @@ bin/
 *.class
 *.crysl
 ensuresPreds
-*.jimple
+d*.jimple
+/sootOutput/
+*.xml
