@@ -6,13 +6,18 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.swing.text.StyleConstants.CharacterConstants;
 
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
+import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
 import soot.ArrayType;
 import soot.Body;
 import soot.BooleanType;
@@ -36,10 +41,14 @@ import soot.Type;
 import soot.Unit;
 import soot.Value;
 import soot.javaToJimple.LocalGenerator;
+import soot.jimple.AddExpr;
 import soot.jimple.ArrayRef;
 import soot.jimple.AssignStmt;
+import soot.jimple.ClassConstant;
 import soot.jimple.Constant;
 import soot.jimple.DoubleConstant;
+import soot.jimple.EqExpr;
+import soot.jimple.GotoStmt;
 import soot.jimple.IdentityStmt;
 import soot.jimple.IntConstant;
 import soot.jimple.InvokeExpr;
@@ -295,10 +304,10 @@ public class OldJimpleCodeGenerator {
 		boolean namesAvailable = true;
 		boolean valuesAvailable = true;
 
-		if (Utils.isNullOrEmpty(paramNames)) {
+		if (CollectionUtils.isEmpty(paramNames)) {
 			namesAvailable = false;
 		} 
-		if (Utils.isNullOrEmpty(paramValues)) {
+		if (CollectionUtils.isEmpty(paramValues)) {
 			valuesAvailable = false;
 		}
 
@@ -371,7 +380,7 @@ public class OldJimpleCodeGenerator {
 
 			List<Type> parameterTypes = initMethod.getParameterTypes();
 			HashMap<Value, List<Unit>> generatedParameterUnits = Maps.newHashMap();
-			if (!Utils.isNullOrEmpty(parameterTypes)) {
+			if (!CollectionUtils.isEmpty(parameterTypes)) {
 				for (Type parameterType : parameterTypes) {
 					generatedParameterUnits.putAll(generateParameterUnit(body, "", parameterType, 1));
 				}
@@ -443,7 +452,7 @@ public class OldJimpleCodeGenerator {
 		// remove caught exceptions
 		removeCaughtExceptionsByThrown(body, exceptions);
 		removeCaughtExceptionsByCatch(body, exceptions, tryUnits);
-		if(Utils.isNullOrEmpty(exceptions)) {
+		if(CollectionUtils.isEmpty(exceptions)) {
 			return;
 		}
 		
@@ -633,6 +642,169 @@ public class OldJimpleCodeGenerator {
 		} else
 			return value;
 	}
+
+	
+	/*-
+  	Scanner s = new Scanner(new File(HardCodedTest.class.getResource("Key.txt").getPath()));
+	int[] a = new int[10];
+	int counter = 0;
+	while (s.hasNext()) {
+		a[counter++] = s.nextInt();
+	}
+	s.close();
+ */
+//private Map<Local, List<Unit>> createScanner(SootClass clazz, Local l, String fileName) {
+//
+//	Type localType = l.getType();
+//	if (localType instanceof ArrayType) {
+//		localType = ((ArrayType) localType).baseType;
+//	}
+//
+//	Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
+//	List<Unit> generatedUnitList = Lists.newArrayList();
+//
+//	// $stack9 = class "Lde/upb/cognicryptfix/test/hardcoded/HardCodedTest;"
+//	RefType clazzRefType = RefType.v("java.lang.Class");
+//	SootClass clazzClass = clazzRefType.getSootClass();
+//	Local clazzLocal = localGenerator.generateFreshLocal(clazzRefType);
+//	ClassConstant clazzConstant = ClassConstant.v("L" + clazz.getName().replace('.', '/'));
+//	Unit clazzAssignment = assignGenerator.generateAssignStmt(clazzLocal, clazzConstant);
+//
+//	// varReplacer0 = "Key.txt";
+//	Local filePathLocal = localGenerator.generateFreshLocal(Scene.v().getType("java.lang.String"), "varReplacer");
+//	StringConstant filePathValue = StringConstant.v(fileName);
+//	Unit filePathAssignment = assignGenerator.generateAssignStmt(filePathLocal, filePathValue);
+//
+//	// $stack10 = virtualinvoke $stack9.<java.lang.Class: java.net.URL
+//	// getResource(java.lang.String)>(varReplacer0);
+//	RefType urlRefType = RefType.v("java.net.URL");
+//	SootClass urlClass = urlRefType.getSootClass();
+//	Local urlLocal = localGenerator.generateFreshLocal(urlRefType, "varReplacer");
+//	SootMethod getResourceMethod = clazzClass.getMethod("java.net.URL getResource(java.lang.String)");
+//	Unit getResourceCall = callGenerator.generateCallUnits(clazzLocal, urlLocal, getResourceMethod, filePathLocal)
+//			.values().iterator().next().get(0);
+//
+//	// $stack11 = virtualinvoke $stack10.<java.net.URL: java.lang.String
+//	// getPath()>();
+//	Local stringPathLocal = localGenerator.generateFreshLocal(Scene.v().getType("java.lang.String"), "varReplacer");
+//	SootMethod getPathMethod = urlClass.getMethod("java.lang.String getPath()");
+//	Unit getPathCall = callGenerator.generateCallUnits(urlLocal, stringPathLocal, getPathMethod).values().iterator()
+//			.next().get(0);
+//
+//	// specialinvoke $stack8.<java.io.File: void
+//	// <init>(java.lang.String)>($stack11);
+//	RefType fileRefType = RefType.v("java.io.File");
+//	SootClass fileClass = fileRefType.getSootClass();
+//	Local fileLocal = localGenerator.generateFreshLocal(fileRefType, "genFile");
+//	SootMethod fileConstructor = fileClass.getMethod("void <init>(java.lang.String)");
+//	Map<Local, List<Unit>> fileConstructorCall = callGenerator.generateCallUnits(fileLocal, null, fileConstructor,
+//			stringPathLocal);
+//
+//	// specialinvoke $stack7.<java.util.Scanner: void
+//	// <init>(java.io.File)>($stack8);
+//	RefType scannerRefType = RefType.v("java.util.Scanner");
+//	SootClass scannerClass = scannerRefType.getSootClass();
+//	Local scannerLocal = localGenerator.generateFreshLocal(scannerRefType, "scanner");
+//	SootMethod scannerConstructor = scannerClass.getMethod("void <init>(java.io.File)");
+//	Map<Local, List<Unit>> scannerConstructorCall = callGenerator.generateCallUnits(scannerLocal, null,
+//			scannerConstructor, fileLocal);
+//
+//	// counter = 0;
+//	Local counterLocal = localGenerator.generateFreshLocal(IntType.v(), "counter");
+//	Unit counterAssignment = assignGenerator.generateAssignStmt(counterLocal, IntConstant.v(0));
+//
+//	// $stack12 = virtualinvoke s.<java.util.Scanner: boolean hasNext()>();
+//	Local hasNextBoolean = localGenerator.generateFreshLocal(BooleanType.v());
+//	SootMethod hasNextMethod = scannerClass.getMethod("boolean hasNext()");
+//	Unit hasNextCall = callGenerator.generateCallUnits(scannerLocal, hasNextBoolean, hasNextMethod).values()
+//			.iterator().next().get(0);
+//
+//	// virtualinvoke s.<java.util.Scanner: void close()>();
+//	SootMethod closeMethod = scannerClass.getMethod("void close()");
+//	Unit closeMethodCall = callGenerator.generateCallUnits(scannerLocal, null, closeMethod).values().iterator()
+//			.next().get(0);
+//
+//	// if $stack12 == 0 goto label2; goto close()
+//	EqExpr clause = Jimple.v().newEqExpr(hasNextBoolean, IntConstant.v(0));
+//	Unit ifStmt = Jimple.v().newIfStmt(clause, closeMethodCall);
+//
+//	// $stack16 = counter;
+//	Local arrayIndex = localGenerator.generateFreshLocal(IntType.v());
+//	Unit indexAssignment = assignGenerator.generateAssignStmt(arrayIndex, counterLocal);
+//
+//	// counter = counter + 1;
+//	AddExpr add = Jimple.v().newAddExpr(counterLocal, IntConstant.v(1));
+//	Unit increasingCounterAssigment = assignGenerator.generateAssignStmt(counterLocal, add);
+//
+//	// $stack17 = virtualinvoke s.<java.util.Scanner: int nextInt()>();
+//	Local nextValueLocal = localGenerator.generateFreshLocal(localType);
+//	List<Unit> nextCall = createNextCall(scannerClass, scannerLocal, nextValueLocal);
+//
+//	// a[$stack16] = $stack17;
+//	ArrayRef leftSide = Jimple.v().newArrayRef(l, arrayIndex);
+//	Unit arrayIndexAssignment = assignGenerator.generateAssignStmt(leftSide, nextValueLocal);
+//
+//	// goto label1;
+//	GotoStmt gotoStmt = Jimple.v().newGotoStmt(hasNextCall);
+//
+//	generatedUnitList.add(clazzAssignment);
+//	generatedUnitList.add(filePathAssignment);
+//	generatedUnitList.add(getResourceCall);
+//	generatedUnitList.add(getPathCall);
+//	generatedUnitList.addAll(fileConstructorCall.values().iterator().next());
+//	generatedUnitList.addAll(scannerConstructorCall.values().iterator().next());
+//	generatedUnitList.add(counterAssignment);
+//	generatedUnitList.add(hasNextCall);
+//	generatedUnitList.add(ifStmt);
+//	generatedUnitList.add(indexAssignment);
+//	generatedUnitList.add(increasingCounterAssigment);
+//	generatedUnitList.addAll(nextCall);
+//	generatedUnitList.add(arrayIndexAssignment);
+//	generatedUnitList.add(gotoStmt);
+//	generatedUnitList.add(closeMethodCall);
+//
+//	generatedUnits.put(l, generatedUnitList);
+//	return generatedUnits;
+//}
+
+//private List<Unit> createNextCall(SootClass scannerClass, Local scannerLocal, Local retLocal) {
+//	Type type = retLocal.getType();
+//	String methodString = "";
+//	List<Unit> generatedUnitList = Lists.newArrayList();
+//
+//	if (JimpleUtils.equals(type, Scene.v().getType("java.lang.String"))
+//			|| JimpleUtils.equals(type, Scene.v().getType("char"))) {
+//		methodString = "java.lang.String next()";
+//	} else {
+//		methodString = type.toString() + " next" + StringUtils.capitalize(type.toString() + "()");
+//	}
+//
+//	SootMethod nextMethod = scannerClass.getMethod(methodString);
+//
+//	if (JimpleUtils.equals(type, Scene.v().getType("char"))) {
+//		RefType stringRefType = RefType.v("java.lang.String");
+//		SootClass stringClass = stringRefType.getSootClass();
+//		Local tempString = localGenerator.generateFreshLocal(stringRefType);
+//		Unit nextCall = callGenerator.generateCallUnits(scannerLocal, tempString, nextMethod).values().iterator()
+//				.next().get(0);
+//
+//		Local index = localGenerator.generateFreshLocal(IntType.v());
+//		Unit indexAssignment = assignGenerator.generateAssignStmt(index, IntConstant.v(0));
+//		SootMethod charAtMethod = stringClass.getMethod("char charAt(int)");
+//		Unit charAtCall = callGenerator.generateCallUnits(tempString, retLocal, charAtMethod, index).values()
+//				.iterator().next().get(0);//
+//
+//		generatedUnitList.add(nextCall);
+//		generatedUnitList.add(indexAssignment);
+//		generatedUnitList.add(charAtCall);
+//	} else {
+//		Unit nextCall = callGenerator.generateCallUnits(scannerLocal, retLocal, nextMethod).values().iterator()
+//				.next().get(0);
+//		generatedUnitList.add(nextCall);
+//
+//	}
+//	return generatedUnitList;
+//}
 
 //	public static void exampleMethodCallGeneration(Body body) {
 //

@@ -1,16 +1,15 @@
 package de.upb.cognicryptfix.generator.jimple;
 
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.commons.collections4.CollectionUtils;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
-import de.upb.cognicryptfix.exception.NoImplementerException;
-import de.upb.cognicryptfix.utils.Utils;
+import de.upb.cognicryptfix.exception.generation.NoInterfaceImplementerException;
 import soot.ArrayType;
 import soot.Body;
 import soot.Local;
@@ -39,17 +38,17 @@ public class JimpleParameterGenerator {
 		this.callGenerator = new JimpleCallGenerator(body);
 	}
 	
-	public Map<Local, List<Unit>> generateParameterUnits(SootMethod method, List<String> names, List<Object> values) {
+	public Map<Local, List<Unit>> generateParameterUnits(SootMethod method, List<String> names, List<Object> values) throws NoInterfaceImplementerException {
 
 		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 		List<Type> types = method.getParameterTypes();
 		boolean namesAvailable = true;
 		boolean valuesAvailable = true;
 
-		if (Utils.isNullOrEmpty(names)) {
+		if (CollectionUtils.isEmpty(names)) {
 			namesAvailable = false;
 		}
-		if (Utils.isNullOrEmpty(values)) {
+		if (CollectionUtils.isEmpty(values)) {
 			valuesAvailable = false;
 		}
 
@@ -74,10 +73,10 @@ public class JimpleParameterGenerator {
 		return generatedUnits;
 	}
 
-	private Map<Local, List<Unit>> generateParameterUnit(Type type, String name, Object value) {
+	private Map<Local, List<Unit>> generateParameterUnit(Type type, String name, Object value) throws NoInterfaceImplementerException {
 		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 
-		if (type instanceof PrimType || type == Scene.v().getType("java.lang.String")) {
+		if (type instanceof PrimType || JimpleUtils.equals(type, Scene.v().getType("java.lang.String"))) {
 			Type primType = type;
 			Local primeLocal = localGenerator.generateFreshLocal(primType, name);
 			Value primeValue = value == null ? JimpleUtils.generateDummyConstantValue(primType) : JimpleUtils.generateConstantValue(value);
@@ -100,16 +99,16 @@ public class JimpleParameterGenerator {
 			Entry<SootClass, SootMethod> init = null;
 			SootClass initClazz = null;
 			SootMethod initMethod = null;
-			try {
-				init = JimpleUtils.getImplementingClassAndInitMethod(refTypeClazz);
+			
+			init = JimpleUtils.getImplementingClassAndInitMethod(refTypeClazz);
+			if(init != null) {
 				initClazz = init.getKey();
 				initMethod = init.getValue();
-			} catch (NoImplementerException e) {
-				e.printStackTrace();
+			} else {
 				initClazz = Scene.v().getSootClass("java.lang.Object");
 				initMethod = initClazz.getMethodByName("");
 			}
-			
+				
 			Local initLocal = localGenerator.generateFreshLocal(initClazz.getType(), name);
 		
 			generatedUnits.put(initLocal, Lists.newArrayList());

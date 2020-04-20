@@ -1,7 +1,9 @@
 package de.upb.cognicryptfix.generator.jimple;
 
+import soot.ArrayType;
 import soot.Local;
 import soot.RefType;
+import soot.Type;
 import soot.Unit;
 import soot.Value;
 import soot.jimple.AssignStmt;
@@ -44,7 +46,15 @@ public class JimpleAssignGenerator {
 	
 	//FOR array 
 	public Unit generateArrayAssignStmt(Local var, int arrayDimension) {
-		Unit arrayAssignStmt = Jimple.v().newAssignStmt(var, Jimple.v().newNewArrayExpr(var.getType(), IntConstant.v(arrayDimension)));
+		Type varType = var.getType();
+		
+		if(varType instanceof ArrayType) {
+			ArrayType arrayType = (ArrayType) var.getType();
+			varType = arrayType.baseType;
+		}
+		Unit arrayAssignStmt = Jimple.v().newAssignStmt(var, Jimple.v().newNewArrayExpr(varType, IntConstant.v(arrayDimension)));
 		return arrayAssignStmt;
 	}
+	
+	
 }

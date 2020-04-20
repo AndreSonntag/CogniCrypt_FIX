@@ -4,6 +4,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.commons.collections4.ListUtils;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -12,8 +17,11 @@ import de.upb.cognicryptfix.crysl.CrySLMethodCall;
 import de.upb.cognicryptfix.crysl.CrySLPredicate;
 import de.upb.cognicryptfix.crysl.CrySLVariable;
 import de.upb.cognicryptfix.crysl.pool.CrySLEntityPool;
-import de.upb.cognicryptfix.exception.NoEnsuredPredicateException;
-import de.upb.cognicryptfix.exception.NoImplementerException;
+import de.upb.cognicryptfix.exception.generation.GenerationException;
+import de.upb.cognicryptfix.exception.generation.NoInterfaceImplementerException;
+import de.upb.cognicryptfix.exception.generation.crysl.CrySLGenerationException;
+import de.upb.cognicryptfix.exception.generation.crysl.NoPredicateEnsurerException;
+import de.upb.cognicryptfix.exception.path.PathException;
 import de.upb.cognicryptfix.generator.jimple.JimpleArrayGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleAssignGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleCallGenerator;
@@ -38,6 +46,7 @@ import soot.Value;
  */
 public class JimpleParameterGeneratorByRule {
 
+	private static final Logger LOGGER = LogManager.getLogger(JimpleParameterGeneratorByRule.class);
 	private CrySLEntityPool pool;
 	private JimpleLocalGenerator localGenerator;
 	private JimpleAssignGenerator assignGenerator;
@@ -57,38 +66,68 @@ public class JimpleParameterGeneratorByRule {
 		this.predicateGenerator = predicateGenerator;
 	}
 
-	public Map<Local, List<Unit>> generateParameterUnits(CrySLMethodCall call) {
+	public Map<Local, List<Unit>> generateParameterUnits(CrySLMethodCall call, Map<Integer, Local>... alreadyGeneratedParameter) throws GenerationException, PathException {
 		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
-
+		boolean parameterAvailable = true;
+		
 		if (call.getCallParameters().size() == 0) {
 			return generatedUnits;
 		}
+		
+		if(alreadyGeneratedParameter.length == 0) {
+			parameterAvailable = false;
+		}
+		
 
+		LOGGER.debug("Call parameters to generate: " + call.getCallParameters());
 		CrySLEntity entity = pool.getEntityByClassName(call.getRule().getClassName());
-		for (CrySLVariable parameter : call.getCallParameters()) {
-			if (entity.requiresPredicate(parameter)) {
-				List<CrySLPredicate> requiredPredicates = entity.getRequiredPredicateForVariableByType(parameter);
-				try {
+
+		for (int i = 0; i < call.getCallParameters().size(); i++) {
+			CrySLVariable parameter = call.getCallParameters().get(i);
+
+			if(!parameterAvailable) {
+				if (entity.requiresPredicate(parameter)) {
+					List<CrySLPredicate> requiredPredicates = entity.getRequiredPredicateForVariableByType(parameter);
+					if (requiredPredicates.isEmpty()) {
+						throw new NoPredicateEnsurerException(
+								"No Rule provides following predicate: " + requiredPredicates.toString());
+					}
 					generatedUnits.putAll(predicateGenerator.generatePredicateUnits(requiredPredicates));
-				} catch (NoEnsuredPredicateException e) {
-					System.err.println("No Rule provides following predicate: "+requiredPredicates.toString());
-					e.printStackTrace();
+				} else {
+					generatedUnits.putAll(generateParameterUnit(parameter));
 				}
 			} else {
-				generatedUnits.putAll(generateParameterUnit(parameter));
+				if(alreadyGeneratedParameter[0].containsKey(i)) {
+					generatedUnits.put(alreadyGeneratedParameter[0].get(i), Lists.newArrayList());
+				} else {
+					if (entity.requiresPredicate(parameter)) {
+						List<CrySLPredicate> requiredPredicates = entity.getRequiredPredicateForVariableByType(parameter);
+						if (requiredPredicates.isEmpty()) {
+							throw new NoPredicateEnsurerException(
+									"No Rule provides following predicate: " + requiredPredicates.toString());
+						}
+						generatedUnits.putAll(predicateGenerator.generatePredicateUnits(requiredPredicates));
+					} else {
+						generatedUnits.putAll(generateParameterUnit(parameter));
+					}
+				}
 			}
 		}
 		return generatedUnits;
 	}
 
-	private Map<Local, List<Unit>> generateParameterUnit(CrySLVariable variable) {
+	private Map<Local, List<Unit>> generateParameterUnit(CrySLVariable variable)
+			throws CrySLGenerationException, NoInterfaceImplementerException, PathException {
+		LOGGER.debug("Generate parameter: " + variable);
+
 		Map<Local, List<Unit>> generatedUnits = Maps.newHashMap();
 
 		String variableName = variable.getName();
 		Type variableType = variable.getType();
 		Value variableValue = variable.getValue();
 
-		if (variableType instanceof PrimType || variableType == Scene.v().getType("java.lang.String")) {
+		if (variableType instanceof PrimType
+				|| JimpleUtils.equals(variableType, Scene.v().getType("java.lang.String"))) {
 			Type primType = variableType;
 			Local primeLocal = localGenerator.generateFreshLocal(primType, variableName);
 
@@ -110,44 +149,41 @@ public class JimpleParameterGeneratorByRule {
 			if (variableValue != null) {
 				generatedUnits
 						.putAll(arrayGenerator.generateArrayUnits(arrayType, Lists.newArrayList(variable.getValue())));
+
 			} else {
 				Local arrayLocal = localGenerator.genereateFreshArrayLocal(arrayType, variableName, 1);
 				Unit arrayAssign = assignGenerator.generateArrayAssignStmt(arrayLocal, 16);
 				List<Unit> arrayUnits = Lists.newArrayList();
 				arrayUnits.add(arrayAssign);
 				generatedUnits.put(arrayLocal, arrayUnits);
-			}
-		} else if (variableType instanceof RefType) {
-			List<CrySLPredicate> predicates = pool.getPossiblePredicateCandidatesForType(variableType);
 
+			}
+
+		} else if (variableType instanceof RefType) {
+
+			List<CrySLPredicate> predicates = pool.getPredicateCandidatesWhichProduceType(variableType);
 			if (!predicates.isEmpty()) {
-				try {
-					generatedUnits.putAll(predicateGenerator.generatePredicateUnits(predicates));
-				} catch (NoEnsuredPredicateException e) {
-					System.err.println("No Rule provides following predicate: "+predicates.toString());
-					e.printStackTrace();
-				}
+				generatedUnits.putAll(predicateGenerator.generatePredicateUnits(predicates));
 				return generatedUnits;
+
 			} else {
 				RefType refType = (RefType) variableType;
 				SootClass refTypeClazz = refType.getSootClass();
 				Entry<SootClass, SootMethod> init = null;
 				SootClass initClazz = null;
 				SootMethod initMethod = null;
+				init = JimpleUtils.getImplementingClassAndInitMethod(refTypeClazz);
 
-				try {
-					init = JimpleUtils.getImplementingClassAndInitMethod(refTypeClazz);
+				if (init != null) {
 					initClazz = init.getKey();
 					initMethod = init.getValue();
-				} catch (NoImplementerException e) {
-					e.printStackTrace();
+				} else {
 					initClazz = Scene.v().getSootClass("java.lang.Object");
 					initMethod = initClazz.getMethodByName("");
 				}
 
 				Local initLocal = localGenerator.generateFreshLocal(initClazz.getType(), variableName);
 				generatedUnits.put(initLocal, Lists.newArrayList());
-
 				Map<Local, List<Unit>> generatedParameterUnits = parameterGenerator.generateParameterUnits(initMethod,
 						null, null);
 				for (List<Unit> l : generatedParameterUnits.values()) {
