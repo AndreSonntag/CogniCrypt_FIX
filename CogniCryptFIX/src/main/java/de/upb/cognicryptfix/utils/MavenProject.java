@@ -96,7 +96,7 @@ public class MavenProject {
 	public HashMap<String, String> getProjectStructureHashMap() {
 		
 		HashMap<String, String> projectHashMap = new HashMap<String, String>();
-		String projectSrcDirPath = pathToProjectRoot+Constants.outerFileSeparator+"src"+Constants.outerFileSeparator;
+		String projectSrcDirPath = pathToProjectRoot+Constants.FILE_SEPARATOR+"src"+Constants.FILE_SEPARATOR;
 		File projectSrcDir = new File(projectSrcDirPath);
 		Collection<File> files = FileUtils.listFiles(projectSrcDir, new SuffixFileFilter("java"), TrueFileFilter.INSTANCE);     
 		for(File file : files){

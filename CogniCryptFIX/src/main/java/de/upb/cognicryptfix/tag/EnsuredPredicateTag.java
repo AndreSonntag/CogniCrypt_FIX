@@ -7,12 +7,12 @@ import soot.Unit;
 import soot.tagkit.AttributeValueException;
 import soot.tagkit.Tag;
 
-public class RequiredExceptionHandlingTag implements Tag{
+public class EnsuredPredicateTag implements Tag{
 
 	List<Unit> units;
 	
-	public RequiredExceptionHandlingTag(List<Unit> tryUnits) {
-		this.units = tryUnits;
+	public EnsuredPredicateTag(List<Unit> units) {
+		this.units = units;
 	}
 
 	public List<Unit> getUnits() {
@@ -28,5 +28,4 @@ public class RequiredExceptionHandlingTag implements Tag{
 	public byte[] getValue() throws AttributeValueException {
 		return null;
 	}
-
 }
