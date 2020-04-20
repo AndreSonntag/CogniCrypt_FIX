@@ -20,7 +20,7 @@ import crypto.rules.CrySLRule;
  */
 public class CrySLReaderUtils {
 
-	private static final Logger logger = LogManager.getLogger(CrySLReaderUtils.class.getSimpleName());
+	private static final Logger logger = LogManager.getLogger(CrySLReaderUtils.class);
 
 	public static List<CrySLRule> readRulesFromSourceFiles(final String folderPath) {
 
@@ -32,6 +32,7 @@ public class CrySLReaderUtils {
 			for (File file : files) {
 				if (file != null && file.getName().endsWith(".crysl")) {
 					temp = file;
+					logger.debug("read: "+file.getName());
 					rules.add(analysisCrySLReader.readRule(file));
 				}
 			}

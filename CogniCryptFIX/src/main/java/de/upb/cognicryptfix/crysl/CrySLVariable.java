@@ -89,7 +89,7 @@ public class CrySLVariable {
 		if (type == null) {
 			if (other.type != null)
 				return false;
-		} else if (type != other.type)
+		} else if (type.getNumber() != other.type.getNumber())
 			return false;
 		if (name == null) {
 			if (other.name != null)
