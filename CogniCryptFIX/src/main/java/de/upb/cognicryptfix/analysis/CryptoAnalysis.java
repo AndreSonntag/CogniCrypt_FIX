@@ -4,11 +4,14 @@ import java.io.File;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
 import java.util.Set;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -20,17 +23,22 @@ import crypto.analysis.CryptoScanner;
 import crypto.rules.CrySLRule;
 import de.upb.cognicryptfix.Constants;
 import de.upb.cognicryptfix.crysl.CrySLReaderUtils;
+import de.upb.cognicryptfix.generator.jimple.JimpleLocalGenerator;
 import de.upb.cognicryptfix.utils.MavenProject;
 import de.upb.cognicryptfix.utils.Utils;
+import soot.Body;
 import soot.EntryPoints;
 import soot.G;
+import soot.Local;
 import soot.PackManager;
+import soot.RefType;
 import soot.Scene;
 import soot.SceneTransformer;
 import soot.SootClass;
 import soot.SootMethod;
 import soot.Transform;
 import soot.Unit;
+import soot.javaToJimple.LocalGenerator;
 import soot.options.Options;
 import soot.util.Chain;
 
@@ -45,6 +53,7 @@ public class CryptoAnalysis {
 
 	private CG DEFAULT_CALL_GRAPH = CG.CHA;
 	public static List<CrySLRule> rules = Lists.newArrayList();
+	public static List<String> unsolvedClasses = Lists.newArrayList();
 	public static CryptoScanner staticScanner = null;
 	public static int round = 1;
 
@@ -68,7 +77,31 @@ public class CryptoAnalysis {
 
 			@Override
 			protected void internalTransform(final String phaseName, final Map<String, String> options) {
-				LOGGER.info("Run CogniCrypt_SAST Analysis round: " + round++);
+				
+				for(SootClass sc : Scene.v().getApplicationClasses()) {
+					
+					if(sc.getPackageName().contains("java.lang")) {
+						continue;
+					}
+					
+					for(SootMethod sm : sc.getMethods()) {
+						Body b = null;
+						try {
+							b = sm.retrieveActiveBody();
+						} catch(java.lang.RuntimeException r){
+							continue;
+						}
+						
+						JimpleLocalGenerator lg = new JimpleLocalGenerator(b);
+						Chain<Local> locals = sm.getActiveBody().getLocals();
+						for(Local lo : locals) {
+							if(lo.getName().contains("#")) {
+								lo.setName(lg.findName(lo.getName().replace("#", "")));
+							}
+						}
+					}
+				}
+				
 				BoomerangPretransformer.v().apply();
 				final ObservableDynamicICFG icfg = new ObservableDynamicICFG(true);
 				CryptoScanner scanner = new CryptoScanner() {
@@ -79,7 +112,8 @@ public class CryptoAnalysis {
 				};
 				staticScanner = scanner;
 				scanner.getAnalysisListener().addReportListener(listener);
-				scanner.scan(rules);				
+				LOGGER.info("Run CogniCrypt_SAST Analysis round: " + round++);
+				scanner.scan(rules);
 			}
 		};
 	}
@@ -123,7 +157,6 @@ public class CryptoAnalysis {
 		Scene.v().loadNecessaryClasses();
 		PackManager.v().getPack("cg").apply();
 		PackManager.v().getPack("wjtp").apply();
-		PackManager.v().runPacks();
 		PackManager.v().writeOutput();
 	}
 
@@ -235,12 +268,17 @@ public class CryptoAnalysis {
 	}
 
 	private void addUnsolvedClasses() {
-		List<String> unsolvedClasses = findUnsolvedClasses(false);
+		unsolvedClasses = findUnsolvedClasses(false);
+		unsolvedClasses.add("java.io.Serializable");
+		unsolvedClasses.add("java.io.FileReader");
+		unsolvedClasses.add("java.io.BufferedReader");
+		unsolvedClasses.add("javax.net.ssl.KeyManager");
+		unsolvedClasses.add("javax.net.ssl.KeyManager");
+		unsolvedClasses.add("javax.net.ssl.TrustManager");
+
 		for (String s : unsolvedClasses) {
-			Scene.v().forceResolve(s, SootClass.SIGNATURES);
+			Scene.v().forceResolve(s, SootClass.HIERARCHY);
 		}
-		Scene.v().forceResolve("java.io.FileReader", SootClass.SIGNATURES);
-		Scene.v().forceResolve("java.io.BufferedReader", SootClass.SIGNATURES);
 	}
 	
 	private List<String> findUnsolvedClasses(boolean print) {
@@ -248,9 +286,6 @@ public class CryptoAnalysis {
 		Set<String> resolvedClassNames = Sets.newHashSet();
 		for (SootClass clazz : resolvedClasses) {
 			resolvedClassNames.add(clazz.getName());
-			if (clazz.getPackageName().contains("de.upb")) {
-				System.out.println(clazz.getName());
-			}
 		}
 
 		List<String> unsolved = Lists.newArrayList();
@@ -261,6 +296,15 @@ public class CryptoAnalysis {
 			} else {
 				solved.add(r.getClassName());
 			}
+
+//			//TODO: refactor
+//			for(Entry<String, String> e :  r.getObjects()) {
+//				if (!resolvedClasses.contains(e.getKey()) && !solved.contains(e.getKey())) {
+//					unsolved.add(e.getKey());
+//				} else {
+//					solved.add(e.getKey());
+//				}
+//			}
 		}
 
 		if (print) {
