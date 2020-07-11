@@ -19,6 +19,7 @@ import crypto.analysis.EnsuredCrySLPredicate;
 import crypto.analysis.IAnalysisSeed;
 import crypto.analysis.errors.AbstractError;
 import crypto.analysis.errors.ConstraintError;
+import crypto.analysis.errors.ErrorWithObjectAllocation;
 import crypto.analysis.errors.ForbiddenMethodError;
 import crypto.analysis.errors.HardCodedError;
 import crypto.analysis.errors.IncompleteOperationError;
@@ -30,6 +31,7 @@ import crypto.extractparameter.ExtractedValue;
 import crypto.interfaces.ISLConstraint;
 import crypto.rules.CrySLPredicate;
 import crypto.rules.CrySLRule;
+import de.upb.cognicryptfix.crysl.pool.CrySLEntityPool;
 import de.upb.cognicryptfix.scheduler.ErrorScheduler;
 import sync.pds.solver.nodes.Node;
 import typestate.TransitionFunction;
@@ -78,14 +80,14 @@ public class CryptoAnalysisListener extends CrySLAnalysisListener{
 		else if(error instanceof HardCodedError) {
 			hardCodedError.add(error);
 		}
+		else if(error instanceof IncompleteOperationError) {
+			incompleteError.add(error);
+		}
 		else if(error instanceof TypestateError) {
 			typeStateError.add(error);
 		}
 		else if(error instanceof ConstraintError) {
 			compValueError.add(error);
-		}
-		else if(error instanceof IncompleteOperationError) {
-			incompleteError.add(error);
 		}
 		else if(error instanceof RequiredPredicateError) {
 			reqPredicateError.add(error);
@@ -93,6 +95,7 @@ public class CryptoAnalysisListener extends CrySLAnalysisListener{
 	}
 	
 	public void afterAnalysis() {
+		CrySLEntityPool.getInstance();
 		errors = Lists.newArrayList();
 		errors.addAll(compValueError);
 		errors.addAll(fMethodError);
