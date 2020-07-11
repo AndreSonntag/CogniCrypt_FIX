@@ -23,6 +23,7 @@ import crypto.analysis.AnalysisSeedWithSpecification;
 import crypto.analysis.errors.AbstractError;
 import crypto.analysis.errors.ConstraintError;
 import crypto.analysis.errors.ForbiddenMethodError;
+import crypto.analysis.errors.HardCodedError;
 import crypto.analysis.errors.IncompleteOperationError;
 import crypto.analysis.errors.NeverTypeOfError;
 import crypto.analysis.errors.RequiredPredicateError;
@@ -149,6 +150,17 @@ public class Utils {
 		return summaryList;
 	}
 
+	public static String getAppropriateVarName(String name) {
+
+		String variableName = "gen";
+
+		for (int i = 0; i < name.length(); i++) {
+			char c = name.charAt(i);
+			variableName += Character.isUpperCase(c) ? c : "";
+		}
+		return variableName;
+	}
+	
 	public static String getAppropriateVarName(CrySLRule rule) {
 
 		String[] splitClassName = rule.getClassName().split("\\.");
@@ -203,37 +215,45 @@ public class Utils {
 		}
 	}
 
-	public static String printErrorInformation(AbstractError error) {
+	public static String printErrorInformation(AbstractError error, boolean printHeader) {
 		String errorType = "";
 		String errorRule = error.getRule().getClassName();
 		String errorClass = error.getErrorLocation().getMethod().getDeclaringClass().toString();
 		String errorOuterMethod = error.getErrorLocation().getMethod().getSignature();
 		String errorMessage = error.toErrorMarkerString();
-
-		if (error instanceof ConstraintError) {
-			errorType = "ConstraintError";
-		} else if (error instanceof ForbiddenMethodError) {
+		String errorStmt = error.getErrorLocation().getUnit().get().toString();
+	
+		if (error instanceof ForbiddenMethodError) {
 			errorType = "ForbiddenMethodError";
 		} else if (error instanceof NeverTypeOfError) {
 			errorType = "NeverTypeOfError";
+		} else if (error instanceof HardCodedError) {
+			errorType = "HardCodedError";
 		} else if (error instanceof TypestateError) {
 			errorType = "TypestateError";
 		} else if (error instanceof IncompleteOperationError) {
 			errorType = "IncompleteOperationError";
 		} else if (error instanceof RequiredPredicateError) {
 			errorType = "RequiredPredicateError";
+		} else if (error instanceof ConstraintError) {
+			errorType = "ConstraintError";
 		}
 
 		StringBuilder builder = new StringBuilder();
-		builder.append(
-				"\n_________________________________________CogniCrypt_SAST_________________________________________\n");
+		if(printHeader) {
+			builder.append(
+					"\n_________________________________________CogniCrypt_SAST_________________________________________\n");
+		}
 		builder.append("Detected: \t" + errorType + "\n");
 		builder.append("CrySLRule: \t" + errorRule + "\n");
-		builder.append("Class: \t\t" + errorClass + "\n");
+		builder.append("Class: \t" + errorClass + "\n");
 		builder.append("Method: \t" + errorOuterMethod + "\n");
+		builder.append("statement: \t" + errorStmt + "\n");
 		builder.append("Message: \t" + errorMessage + "\n");
+		if(printHeader) {
 		builder.append(
 				"_________________________________________________________________________________________________\n");
+		}
 		return builder.toString();
 
 	}

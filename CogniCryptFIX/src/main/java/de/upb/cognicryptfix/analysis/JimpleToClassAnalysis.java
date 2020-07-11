@@ -118,7 +118,6 @@ public class JimpleToClassAnalysis {
 		Scene.v().loadNecessaryClasses();
 		PackManager.v().getPack("cg").apply();
 		PackManager.v().getPack("wjtp").apply();
-		PackManager.v().runPacks();
 		PackManager.v().writeOutput();
 	}
 
@@ -142,7 +141,7 @@ public class JimpleToClassAnalysis {
 		Options.v().set_soot_classpath(inputPath + File.pathSeparator + Constants.JCE_PATH);
 		Options.v().set_process_dir(Lists.newArrayList(inputPath));
 		Options.v().set_full_resolver(true);
-		Scene.v().forceResolve("java.util.Scanner", SootClass.SIGNATURES);
+		addUnsolvedClasses();
 		Scene.v().loadNecessaryClasses();
 		Scene.v().setEntryPoints(getEntryPoints());
 	}
@@ -154,6 +153,12 @@ public class JimpleToClassAnalysis {
 		return entryPoints;
 	}
 
+	private void addUnsolvedClasses() {
+		for (String s : CryptoAnalysis.unsolvedClasses) {
+			Scene.v().forceResolve(s, SootClass.SIGNATURES);
+		}
+	}
+	
 	private List<String> getIncludeList() {
 		final List<String> includeList = new LinkedList<String>();
 		includeList.add("java.lang.AbstractStringBuilder");

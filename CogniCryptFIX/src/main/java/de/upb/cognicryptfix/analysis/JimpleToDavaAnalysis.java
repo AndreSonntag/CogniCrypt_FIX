@@ -3,6 +3,7 @@ package de.upb.cognicryptfix.analysis;
 import java.io.File;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,7 @@ import org.apache.logging.log4j.Logger;
 import com.google.common.collect.Lists;
 
 import de.upb.cognicryptfix.Constants;
+import de.upb.cognicryptfix.generator.jimple.JimpleTrapGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
 import de.upb.cognicryptfix.utils.Utils;
 import soot.EntryPoints;
@@ -23,10 +25,14 @@ import soot.SceneTransformer;
 import soot.SootClass;
 import soot.SootMethod;
 import soot.Transform;
+import soot.Unit;
+import soot.UnitPatchingChain;
 import soot.dava.Dava;
 import soot.dava.DavaBody;
+import soot.dava.DavaPrinter;
 import soot.grimp.Grimp;
 import soot.grimp.GrimpBody;
+import soot.jimple.InvokeExpr;
 import soot.jimple.JimpleBody;
 import soot.options.Options;
 import soot.util.Chain;
@@ -41,7 +47,9 @@ public class JimpleToDavaAnalysis {
 		CHA, SPARK_LIBRARY, SPARK
 	}
 
-	private JimpleToDavaAnalysis() {}
+	private JimpleToDavaAnalysis() {
+		
+	}
 
 	public static JimpleToDavaAnalysis getInstance() {
 		if (JimpleToDavaAnalysis.instance == null) {
@@ -58,9 +66,21 @@ public class JimpleToDavaAnalysis {
 				Instant start = Instant.now();
 				Chain<SootClass> appClasses = Scene.v().getApplicationClasses();
 				for(SootClass appClass : appClasses) {
-					LOGGER.debug("Transformed class: "+appClass.getName());
+					LOGGER.debug("Class transformation: "+appClass.getName());
+					if(appClass.getName().equals("com.mastercard.developer.interceptors.OkHttp2FieldLevelEncryptionInterceptor")) {
+						System.out.println(1);
+					}
+					
 					for(SootMethod appClassMethod : appClass.getMethods()) {
-						JimpleBody jimpleBody = (JimpleBody) appClassMethod.retrieveActiveBody();
+						LOGGER.debug("Method transformations: "+appClassMethod.getName());
+						JimpleBody jimpleBody = (JimpleBody) appClassMethod.getActiveBody();
+//						JimpleTrapGenerator trapGenerator = new JimpleTrapGenerator(jimpleBody);
+//						Iterator it = jimpleBody.getUnits().snapshotIterator();		
+//						while(it.hasNext()) {
+//							Unit next = (Unit) it.next();
+//							trapGenerator.generateTrap(next);
+//						}
+						
 						GrimpBody grimpBody = Grimp.v().newBody(jimpleBody, "gb");
 						DavaBody davaBody = Dava.v().newBody(grimpBody);
 						appClassMethod.setActiveBody(davaBody);
@@ -98,7 +118,7 @@ public class JimpleToDavaAnalysis {
 		PackManager.v().getPack("cg").apply();
 		PackManager.v().getPack("wjtp").apply();
 		PackManager.v().getPack("wjop").apply();
-		PackManager.v().writeOutput();
+//		PackManager.v().writeOutput();
 	}
 
 
@@ -126,7 +146,7 @@ public class JimpleToDavaAnalysis {
 		Options.v().set_soot_classpath(inputPath + File.pathSeparator + Constants.JCE_PATH);
 		Options.v().set_process_dir(Lists.newArrayList(inputPath));
 		Options.v().set_full_resolver(true);
-		Scene.v().forceResolve("java.util.Scanner", SootClass.SIGNATURES);
+		addUnsolvedClasses();
 		Scene.v().loadNecessaryClasses();
 		Scene.v().setEntryPoints(getEntryPoints());
 	}
@@ -151,6 +171,12 @@ public class JimpleToDavaAnalysis {
 		includeList.add("java.lang.StringCoding");
 		includeList.add("java.lang.StringIndexOutOfBoundsException");
 		return includeList;
+	}
+	
+	private void addUnsolvedClasses() {
+		for (String s : CryptoAnalysis.unsolvedClasses) {
+			Scene.v().forceResolve(s, SootClass.SIGNATURES);
+		}
 	}
 	
 	private void registerJimpleToDavaTransformer() {

@@ -48,9 +48,13 @@ import soot.jimple.NullConstant;
 import soot.jimple.StringConstant;
 import soot.jimple.internal.JimpleLocalBox;
 import soot.jimple.toolkits.base.Aggregator;
+import soot.jimple.toolkits.callgraph.CallGraph;
+import soot.jimple.toolkits.callgraph.Edge;
 import soot.jimple.toolkits.scalar.DeadAssignmentEliminator;
 import soot.jimple.toolkits.scalar.IdentityCastEliminator;
 import soot.jimple.toolkits.scalar.UnreachableCodeEliminator;
+import soot.tagkit.InnerClassTag;
+import soot.tagkit.Tag;
 import soot.toolkits.scalar.LocalPacker;
 import soot.toolkits.scalar.UnusedLocalEliminator;
 
@@ -246,6 +250,8 @@ public class JimpleUtils {
 		}
 	}
 
+	
+	
 	public static boolean isHighestSuperCryptoInterfaceOrAbstractClass(Type type) {
 
 		if (type instanceof RefType) {
@@ -254,12 +260,13 @@ public class JimpleUtils {
 
 			if (refTypeClazz.isInterface()) {
 				Hierarchy hrchy = getHierarchy();
-				List<SootClass> superInterfaces = Lists.newArrayList();
+				List<SootClass> superInterfaces = Lists.newArrayList();			
 				try {
-					superInterfaces = hrchy.getSuperinterfacesOf(refTypeClazz);
+					superInterfaces = hrchy.getSuperinterfacesOf(refTypeClazz); //TODO: very very important!
 				} catch(NullPointerException np) {
 					return false;
 				}
+		
 				for (SootClass superInterface : superInterfaces) {
 					String packagePath = superInterface.getPackageName();
 					if (packagePath.contains("java.security") || packagePath.contains("javax.crypto") || packagePath.contains("javax.net.ssl")) {
@@ -288,6 +295,7 @@ public class JimpleUtils {
 
 		if (clazz.isConcrete()) {
 			SootMethod init = getBestInitializationMethod(clazz);
+
 			return new SimpleEntry<SootClass, SootMethod>(clazz, init);
 		} else if (clazz.isInterface() || clazz.isAbstract()) {
 			List<SootClass> clazzCandidates = getImplementedInterfaceOrAbstractClass(clazz);
@@ -296,6 +304,7 @@ public class JimpleUtils {
 				Map<SootClass, SootMethod> classInitMethodMap = Maps.newHashMap();
 
 				for (SootClass clazzCandidate : clazzCandidates) {
+						
 					SootMethod initMethod = getBestInitializationMethod(clazzCandidate);
 					if (initMethod != null) {
 						classInitMethodMap.put(clazzCandidate, initMethod);
@@ -330,6 +339,7 @@ public class JimpleUtils {
 		List<SootClass> concreteImplementatons = Lists.newArrayList();
 		List<SootClass> implementations = Lists.newArrayList(getFastHierarchy().getAllImplementersOfInterface(clazz));
 
+		
 		for (SootClass implementation : implementations) {
 			if (implementation.isConcrete()) {
 				concreteImplementatons.add(implementation);
@@ -358,7 +368,7 @@ public class JimpleUtils {
 				if (!useOfNotSupportedType) {
 					initMethods.add(method);
 				}
-			}
+			} 
 		}
 		Collections.sort(initMethods, new InitializationMethodSorter());
 		return initMethods.isEmpty() ? null : initMethods.get(0);

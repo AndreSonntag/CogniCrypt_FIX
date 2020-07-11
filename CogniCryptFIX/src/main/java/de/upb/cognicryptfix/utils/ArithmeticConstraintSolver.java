@@ -16,7 +16,7 @@ import crypto.rules.CrySLArithmeticConstraint.ArithOp;
  */
 public class ArithmeticConstraintSolver {
 
-	private static final Logger logger = LogManager.getLogger(ArithmeticConstraintSolver.class.getSimpleName());
+	private static final Logger logger = LogManager.getLogger(ArithmeticConstraintSolver.class);
 	private ArithOp operator;
 	private Pair<String, String> leftPair; // we use <String,String>, because we don't know if the value is int or double
 	private Pair<String, String> rightPair;

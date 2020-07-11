@@ -13,7 +13,7 @@ public class HeadlessRepairerOptions extends Options {
 
 	public HeadlessRepairerOptions() {
 
-		Option rulesDir = Option.builder().longOpt("rulesDir").hasArg().required()
+		Option rulesDir = Option.builder().longOpt("rulesDir").hasArg()
 				.desc("Specify the directory for the CrySL rules")
 				.build();
 		addOption(rulesDir);
