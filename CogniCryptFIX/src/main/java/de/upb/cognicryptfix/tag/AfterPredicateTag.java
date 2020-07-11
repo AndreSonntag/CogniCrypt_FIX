@@ -1,27 +1,16 @@
 package de.upb.cognicryptfix.tag;
 
-import java.util.List;
-
 import de.upb.cognicryptfix.Constants;
-import soot.Unit;
 import soot.tagkit.AttributeValueException;
 import soot.tagkit.Tag;
 
-public class EnsuredPredicateTag implements Tag{
+public class AfterPredicateTag implements Tag{
 
-	List<Unit> units;
-	
-	public EnsuredPredicateTag(List<Unit> units) {
-		this.units = units;
-	}
-
-	public List<Unit> getUnits() {
-		return units;
-	}
+	public AfterPredicateTag() {}
 
 	@Override
 	public String getName() {
-		return Constants.ENSURED_PREDICATE_TAG;
+		return Constants.AFTER_PREDICATE_TAG;
 	}
 
 	@Override
