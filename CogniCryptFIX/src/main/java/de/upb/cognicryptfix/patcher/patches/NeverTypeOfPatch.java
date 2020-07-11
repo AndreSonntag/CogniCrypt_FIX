@@ -7,6 +7,7 @@ import java.util.Set;
 
 import javax.activation.UnsupportedDataTypeException;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -32,6 +33,7 @@ import de.upb.cognicryptfix.exception.patch.NotSupportedErrorException;
 import de.upb.cognicryptfix.exception.patch.RepairException;
 import de.upb.cognicryptfix.generator.JimpleCodeGeneratorByRule;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
+import de.upb.cognicryptfix.scheduler.ErrorScheduler;
 import de.upb.cognicryptfix.utils.BoomerangUtils;
 import de.upb.cognicryptfix.utils.Utils;
 import soot.ArrayType;
@@ -45,6 +47,7 @@ import soot.Type;
 import soot.Unit;
 import soot.Value;
 import soot.jimple.AssignStmt;
+import soot.jimple.Constant;
 import soot.jimple.InvokeExpr;
 import soot.jimple.StringConstant;
 import sync.pds.solver.nodes.Node;
@@ -60,12 +63,14 @@ public class NeverTypeOfPatch extends AbstractPatch {
 	private JimpleCodeGeneratorByRule generator;
 	private ObservableICFG<Unit, SootMethod> icfg;
 	private List<Unit> patch;
-	
+
 	private List<Integer> supportedTypes;
 
+	
+	//Datatype comes from a parameter, or method call
 	/**
 	 * Creates a new {@link NeverTypeOfPatch} object that represents the patch for
-	 * the {@link NeverTypeOfError} argument. 
+	 * the {@link NeverTypeOfError} argument.
 	 * 
 	 * @param error the error
 	 */
@@ -77,36 +82,35 @@ public class NeverTypeOfPatch extends AbstractPatch {
 		this.generator = new JimpleCodeGeneratorByRule(body);
 		this.icfg = CryptoAnalysis.staticScanner.icfg();
 		this.patch = Lists.newArrayList();
-		this.supportedTypes = Lists.newArrayList(Scene.v().getType("char[]").getNumber(), Scene.v().getType("byte[]").getNumber());
+		this.supportedTypes = Lists.newArrayList(Scene.v().getType("char[]").getNumber(),
+				Scene.v().getType("byte[]").getNumber());
 	}
 
 	@Override
-	public Body applyPatch() throws RepairException {		
-		
-		if (constraint instanceof CrySLPredicate) {
-			CrySLPredicate pred = (CrySLPredicate) constraint;
-			if (pred.getPredName().equals("neverTypeOf")) {
-				Type forbiddenType = Scene.v().getType(pred.getParameters().get(1).toString());
-				String variableName = pred.getParameters().get(0).getName();
-				CrySLVariable variable = entity.getVariableByName(variableName);
-				Type targetType = variable.getType();
+	public Body applyPatch() throws RepairException {
 
-				if (JimpleUtils.equals(forbiddenType, Scene.v().getType("java.lang.String"))) {
-					replaceStringType(targetType);
-				} else {
-					throw new NotSupportedUnitTypeException("NeverTypeOfPatch supports just the wrapping of java.lang.String! used Type: "+ forbiddenType.toQuotedString());
-				}
+		CrySLPredicate pred = (CrySLPredicate) constraint;
+		if (pred.getPredName().equals("neverTypeOf")) {
+			Type forbiddenType = Scene.v().getType(pred.getParameters().get(1).toString());
+			String variableName = pred.getParameters().get(0).getName();
+			CrySLVariable variable = entity.getVariableByName(variableName);
+			Type targetType = variable.getType();
+
+			if (JimpleUtils.equals(forbiddenType, Scene.v().getType("java.lang.String"))) {
+				replaceStringType(targetType);
 			} else {
-				throw new NotSupportedErrorException(
-						"CrySLPredicate doesn't contain neverTypeOf! used predicate: " + pred.getPredName());
+				throw new NotSupportedUnitTypeException(
+						"NeverTypeOfPatch supports just the wrapping of java.lang.String! used Type: "
+								+ forbiddenType.toQuotedString());
 			}
 		} else {
 			throw new NotSupportedErrorException(
-					"NeverTypeOfPatch supports just the repair of the CrySLPredicate neverTypeOf! used constraint: "
-							+ constraint.getName());
+					"CrySLPredicate doesn't contain neverTypeOf! used predicate: " + pred.getPredName());
 		}
-		
-		return body;
+	
+
+	return body;
+
 	}
 
 	private void replaceStringType(Type targetType) throws NotExpectedUnitException, NotSupportedUnitTypeException {
@@ -127,32 +131,39 @@ public class NeverTypeOfPatch extends AbstractPatch {
 			 * Boomerang workaround: replace the wrapperInvokeExpr by the local which calls
 			 * the wrapper call to get the original String value by Boomerang
 			 */
+			Value originalValue = wrapperAssignStmt.getRightOp();
 			wrapperAssignStmt.setRightOp(wrapperInputLocal);
-
-			AssignStmt stringAssignStmt = getAssignStmt(error.getCallSiteWithExtractedValue().getCallSite().stmt(), error.getErrorLocation().getUnit().get(), wrapperInputLocal);
-			generatedUnits = generateArrayUnitsForStringType((Local) wrapperAssignStmt.getLeftOp() ,(ArrayType) targetType, (StringConstant) stringAssignStmt.getRightOp());
+			AssignStmt stringAssignStmt = getAllocationAssignStmt(error.getCallSiteWithExtractedValue().getCallSite().stmt(), error.getErrorLocation().getUnit().get(), wrapperInputLocal);
+			
+			if(stringAssignStmt == null) {
+				wrapperAssignStmt.setRightOp(originalValue);
+				throw new NotExpectedUnitException("Parameter value comes from a stream/database/other external source!");
+			}
+			
+			generatedUnits = generateArrayUnitsForStringType((Local) wrapperAssignStmt.getLeftOp(),(ArrayType) targetType, (StringConstant) stringAssignStmt.getRightOp());
 			body.getUnits().insertAfter(Utils.summarizeUnitLists(generatedUnits.values()), wrapperAssignStmt);
 			body.getUnits().remove(stringAssignStmt);
 			body.getUnits().remove(wrapperAssignStmt);
 			patch.addAll(Utils.summarizeUnitLists(generatedUnits.values()));
-			
-			
+
 		} else {
-			throw new NotExpectedUnitException("CallSiteValue doesn't contain an AssignStmt with an InvokeExpr! Unit: " + wrapperUnit);
+			throw new NotExpectedUnitException(
+					"CallSiteValue doesn't contain an AssignStmt with an InvokeExpr! Unit: " + wrapperUnit);
 		}
 	}
 
-	private Map<Local, List<Unit>> generateArrayUnitsForStringType(Local arrayLocal, ArrayType targetType, StringConstant value) {
+	private Map<Local, List<Unit>> generateArrayUnitsForStringType(Local arrayLocal, ArrayType targetType,
+			StringConstant value) {
 
 		Map<Local, List<Unit>> generatedUnits = Maps.newHashMap();
 		List<Value> constants = Lists.newArrayList();
 		String valueString = ((StringConstant) value).value;
 
-		if (targetType.baseType instanceof CharType) {
+		if (JimpleUtils.equals(targetType, Scene.v().getType("char[]")) ) {
 			for (char c : valueString.toCharArray()) {
-				constants.add(JimpleUtils.generateConstantValue((int)c));
+				constants.add(JimpleUtils.generateConstantValue((int) c));
 			}
-		} else if (targetType.baseType instanceof ByteType) {
+		} else if (JimpleUtils.equals(targetType, Scene.v().getType("byte[]")) ) {
 			for (char c : valueString.toCharArray()) {
 				byte b = (byte) c;
 				constants.add(JimpleUtils.generateConstantValue(b));
@@ -161,61 +172,71 @@ public class NeverTypeOfPatch extends AbstractPatch {
 		generatedUnits = generator.generateArray(arrayLocal, constants);
 		return generatedUnits;
 	}
-	
-	private AssignStmt getAssignStmt(Statement errorStatement, Unit errorCallUnit, Local errorParamLocal) throws NotExpectedUnitException {
-		List<ExtractedValue> extractedValues = BoomerangUtils.runBommerang(icfg, errorParamLocal, errorStatement,errorCallUnit);
-		AssignStmt stringAssignStmt = getAssignStmt(extractedValues.get(0), errorParamLocal);
-		return stringAssignStmt;
+
+	private AssignStmt getAllocationAssignStmt(Statement errorStatement, Unit errorCallUnit, Local errorParamLocal) throws NotExpectedUnitException {
+		List<ExtractedValue> extractedValues = BoomerangUtils.runBommerang(icfg, errorParamLocal, errorStatement, errorCallUnit);
+		
+		if(CollectionUtils.isEmpty(extractedValues)) {
+			return null;
+		}
+		
+		List<ExtractedValue> evList = extractedValues;
+		for(ExtractedValue ev : evList) {
+			if(ev.stmt().getMethod().getSignature().equals(error.getErrorLocation().getMethod().getSignature())) {
+				AssignStmt extracted = getAssignStmt(ev, errorParamLocal);
+				if(extracted != null) {
+					return extracted;
+				}
+			} else {
+				
+			}		
+		}
+				
+		return null;
 	}
 
 	private AssignStmt getAssignStmt(ExtractedValue ev, Local errorParamLocal) throws NotExpectedUnitException {
 
-		Set<Unit> unsortedUnitSet = Sets.newHashSet();
-		List<Unit> sortedUnitList = Lists.newArrayList();
-		AssignStmt stmt = null;
+		if(!(ev.getValue() instanceof Constant)) {
+			return null;
+		}
 		
+		Constant value = (Constant) ev.getValue();
+		AssignStmt ret = null;
 		for (Node<Statement, Val> node : ev.getDataFlowPath()) {
-			unsortedUnitSet.add(node.stmt().getUnit().get());
-		}
-
-		for (Unit u : body.getUnits()) {
-			if (unsortedUnitSet.contains(u)) {
-				sortedUnitList.add(u);
-			}
-		}
-
-		Collections.reverse(sortedUnitList);
-		for (Unit u : sortedUnitList) {
-			if (u instanceof AssignStmt) {
-				AssignStmt assignStmt = (AssignStmt) u;
-				if (assignStmt.getRightOp() instanceof StringConstant) {
-					stmt = assignStmt;
-					break;
+			if(node.stmt().getUnit().get() instanceof AssignStmt) {
+				AssignStmt assignStmt = (AssignStmt) node.stmt().getUnit().get();
+				if(assignStmt.getRightOp() instanceof StringConstant) {
+					if(assignStmt.getRightOp() == value) {
+						ret = assignStmt;
+						break;
+					}
 				}
 			}
 		}
-		
-		if(stmt != null) {
-			return stmt;
-		} else {
-			throw new NotExpectedUnitException("Local doesn't contain any String assignment! used Local: "+errorParamLocal.toString()+" sortedDataFlow: "+sortedUnitList.toString());
-		}
-		
-	}
 
+		if (ret != null) {
+			return ret;
+		} else {
+			throw new NotExpectedUnitException("Local doesn't contain a String assignment! used Local: "
+					+ errorParamLocal.toString() + " dataFlow: " + ev.getDataFlowPath().toString());
+		}
+	}
+	
 	@Override
 	public String toPatchString() {
 		StringBuilder builder = new StringBuilder();
 		builder.append("\n__________[NeverTypeOfPatch]__________\n");
-		builder.append("Class: \t\t" + error.getErrorLocation().getMethod().getDeclaringClass().toString() + "\n");
+		builder.append("Repaired in Round: \t" + ErrorScheduler.round+ "\n");
+		builder.append("Class: \t" + error.getErrorLocation().getMethod().getDeclaringClass().toString() + "\n");
 		builder.append("Method: \t" + error.getErrorLocation().getMethod().getSignature() + "\n");
-		builder.append("Error: \t\t" + error.getClass().getSimpleName() + "\n");
+		builder.append("Error: \t" + error.getClass().getSimpleName() + "\n");
 		builder.append("CrySLRule: \t" + entity.getRule().getClassName() + "\n");
 		builder.append("Constraint: \t" + "NeverTypeOf" + "\n");
 		builder.append("Message: \t" + error.toErrorMarkerString() + "\n");
-		builder.append("Patch: \t\t" + patch.toString());
+		builder.append("Patch: \t" + patch.toString());
 		builder.append("\n");
-		builder.append("________________________________________\n");
+		builder.append("__________________________________________");
 		return builder.toString();
 	}
 

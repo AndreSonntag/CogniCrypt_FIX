@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -14,14 +15,19 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 import crypto.analysis.errors.ForbiddenMethodError;
+import de.upb.cognicryptfix.Constants;
 import de.upb.cognicryptfix.crysl.CrySLEntity;
 import de.upb.cognicryptfix.crysl.CrySLMethodCall;
 import de.upb.cognicryptfix.crysl.pool.CrySLEntityPool;
+import de.upb.cognicryptfix.exception.generation.GenerationException;
 import de.upb.cognicryptfix.exception.patch.RepairException;
 import de.upb.cognicryptfix.exception.path.NoCallFoundException;
+import de.upb.cognicryptfix.exception.path.PathException;
 import de.upb.cognicryptfix.generator.JimpleCodeGeneratorByRule;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
+import de.upb.cognicryptfix.scheduler.ErrorScheduler;
 import de.upb.cognicryptfix.utils.InitializationMethodSorter;
+import de.upb.cognicryptfix.utils.Utils;
 import soot.Body;
 import soot.Local;
 import soot.SootMethod;
@@ -80,7 +86,7 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 		return body;
 	}
 
-	private void replaceForbiddenMethod(Unit forbiddenUnit, SootMethod forbiddenMethod, SootMethod alternativeMethod) throws NoCallFoundException {
+	private void replaceForbiddenMethod(Unit forbiddenUnit, SootMethod forbiddenMethod, SootMethod alternativeMethod) throws GenerationException, PathException {
 
 		Map<Local, List<Unit>> generatedCallUnits = Maps.newLinkedHashMap();
 		Map<Local, List<Unit>> generatedParameterUnits = Maps.newLinkedHashMap();
@@ -99,15 +105,8 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 		Local[] parameterLocals = generatedParameterUnits.keySet().toArray(new Local[0]);
 		generatedCallUnits = generator.generateCall(invokeLocal, call, true, parameterLocals);
 
-		List<Unit> parameterUnitList = Lists.newArrayList();
-		for (List<Unit> l : generatedParameterUnits.values()) {
-			parameterUnitList.addAll(l);
-		}
-
-		List<Unit> callUnitList = Lists.newArrayList();
-		for (List<Unit> l : generatedCallUnits.values()) {
-			callUnitList.addAll(l);
-		}
+		List<Unit> parameterUnitList = Utils.summarizeUnitLists(generatedParameterUnits.values());
+		List<Unit> callUnitList = Utils.summarizeUnitLists(generatedCallUnits.values());
 		
 		insertParameterUnits(forbiddenUnit, parameterUnitList);
 		insertAlternativeCallUnits(forbiddenMethod, forbiddenUnit, alternativeMethod, callUnitList);
@@ -115,6 +114,16 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 
 	private void insertParameterUnits(Unit forbiddenUnit, List<Unit> parameterUnits) {
 		if (!parameterUnits.isEmpty()) {
+			
+			List<Unit> afterPredicateUnits = parameterUnits.stream()                
+		                .filter(unit -> unit.getTag(Constants.AFTER_PREDICATE_TAG) != null)
+		                .collect(Collectors.toList());
+			 
+			if(!afterPredicateUnits.isEmpty()) {
+				parameterUnits.removeAll(afterPredicateUnits); 
+				body.getUnits().insertAfter(afterPredicateUnits, forbiddenUnit);
+			} 
+			
 			body.getUnits().insertBefore(parameterUnits, forbiddenUnit);
 		}
 	}
@@ -173,7 +182,9 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 				for(Type alterParams : alternativeMethod.getParameterTypes()) {
 					if(JimpleUtils.equals(arg.getType(), alterParams)) {
 						if(!parameterMatchMap.containsKey(i)) {
-							parameterMatchMap.put(i, (Local) arg);
+							if(arg instanceof Local) {
+								parameterMatchMap.put(i, (Local) arg);
+							}  
 						} else {
 							continue;
 						}
@@ -190,19 +201,20 @@ public class ForbiddenMethodPatch extends AbstractPatch {
 	public String toPatchString() {
 		StringBuilder builder = new StringBuilder();
 		builder.append("\n__________[ForbiddenMethodPatch]__________\n");
-		builder.append("Class: \t\t"+error.getErrorLocation().getMethod().getDeclaringClass().toString()+"\n");
+		builder.append("Repaired in Round: \t" + ErrorScheduler.round+ "\n");
+		builder.append("Class: \t"+error.getErrorLocation().getMethod().getDeclaringClass().toString()+"\n");
 		builder.append("Method: \t"+error.getErrorLocation().getMethod().getSignature()+"\n");
-		builder.append("Error: \t\t"+error.getClass().getSimpleName()+"\n");
+		builder.append("Error: \t"+error.getClass().getSimpleName()+"\n");
 		builder.append("CrySLRule: \t"+entity.getRule().getClassName()+"\n");
 		builder.append("Message: \t"+error.toErrorMarkerString()+"\n");
-		builder.append("Patch: \t\t");
+		builder.append("Patch: \t");
 		if(patch == null) {
 			builder.append("Forbidden call removed");
 		} else {
 			builder.append(patch);
 		}
 		builder.append("\n");
-		builder.append("________________________________________\n");
+		builder.append("__________________________________________");
 		return builder.toString();
 	}
 

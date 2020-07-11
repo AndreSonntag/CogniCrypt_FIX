@@ -2,40 +2,39 @@ package de.upb.cognicryptfix.patcher.patches;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.SecureRandom;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.stream.IntStream;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.io.Files;
 
 import crypto.analysis.errors.HardCodedError;
 import crypto.extractparameter.ExtractedValue;
-import de.upb.cognicryptfix.Constants;
 import de.upb.cognicryptfix.crysl.CrySLEntity;
-import de.upb.cognicryptfix.crysl.CrySLMethodCall;
 import de.upb.cognicryptfix.crysl.pool.CrySLEntityPool;
+import de.upb.cognicryptfix.exception.generation.GenerationException;
 import de.upb.cognicryptfix.exception.jimple.NotExpectedUnitException;
 import de.upb.cognicryptfix.exception.patch.RepairException;
 import de.upb.cognicryptfix.generator.jimple.JimpleAssignGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleCallGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleLocalGenerator;
-import de.upb.cognicryptfix.generator.jimple.JimpleTrapGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
+import de.upb.cognicryptfix.scheduler.ErrorScheduler;
 import de.upb.cognicryptfix.utils.CharConstant;
 import de.upb.cognicryptfix.utils.Utils;
 import soot.ArrayType;
 import soot.Body;
-import soot.BooleanType;
 import soot.CharType;
 import soot.IntType;
 import soot.Local;
@@ -51,7 +50,6 @@ import soot.Value;
 import soot.jimple.AddExpr;
 import soot.jimple.ArrayRef;
 import soot.jimple.AssignStmt;
-import soot.jimple.ClassConstant;
 import soot.jimple.Constant;
 import soot.jimple.EqExpr;
 import soot.jimple.GeExpr;
@@ -61,8 +59,6 @@ import soot.jimple.Jimple;
 import soot.jimple.LengthExpr;
 import soot.jimple.NewArrayExpr;
 import soot.jimple.StringConstant;
-import soot.jimple.ThisRef;
-import soot.jimple.internal.JimpleLocal;
 import soot.options.Options;
 
 public class HardCodedPatch extends AbstractPatch {
@@ -72,7 +68,6 @@ public class HardCodedPatch extends AbstractPatch {
 
 	private CrySLEntity entity;
 	private Body body;
-	private JimpleTrapGenerator trapGenerator;
 	private JimpleLocalGenerator localGenerator;
 	private JimpleAssignGenerator assignGenerator;
 	private JimpleCallGenerator callGenerator;
@@ -91,7 +86,6 @@ public class HardCodedPatch extends AbstractPatch {
 		this.localGenerator = new JimpleLocalGenerator(body);
 		this.assignGenerator = new JimpleAssignGenerator();
 		this.callGenerator = new JimpleCallGenerator(body);
-		this.trapGenerator = new JimpleTrapGenerator(body);
 		this.patch = "";
 	}
 
@@ -100,6 +94,11 @@ public class HardCodedPatch extends AbstractPatch {
 		Unit errorUnit = error.getErrorLocation().getUnit().get();
 		ExtractedValue ev = error.getCallSiteWithExtractedValue().getVal();
 		Type errorLocalType = ev.getValue().getType();
+		
+		if(!ev.stmt().getMethod().getSignature().equals(error.getErrorLocation().getMethod().getSignature())) {
+			throw new NotExpectedUnitException("Parameter value comes from a stream/database/other external source!");
+		} 
+		
 		
 		if (errorLocalType instanceof ArrayType) {
 			Entry<List<Unit>, List<Value>> valueEntry = extraxtHardCodedArrayValue(ev, errorUnit);
@@ -128,26 +127,40 @@ public class HardCodedPatch extends AbstractPatch {
 		return body;
 	}
 
-	private String createFileWithContent(SootClass clazz, SootMethod method, Type valueType, Value... value) {
+	private String createFileWithContent(SootClass clazz, SootMethod method, Type valueType, Value... value) throws RepairException {
 		String pathWithName = SourceLocator.v().getFileNameFor(clazz, Options.output_format_jimple);
+		pathWithName = pathWithName.replaceAll("[\\\\/:*?\"<>|]", "");
 		String path = pathWithName.substring(0,  pathWithName.lastIndexOf("\\")+1);
 		String nameWithJimplePrefix = pathWithName.substring(pathWithName.lastIndexOf("\\") + 1);
 		String nameWithoutPrefix = nameWithJimplePrefix.substring(0,  nameWithJimplePrefix.lastIndexOf("."));
 		String name = nameWithoutPrefix.substring(0,  nameWithoutPrefix.lastIndexOf(".")+1)+method.getName()+"_"+ nameWithoutPrefix.substring(nameWithoutPrefix.lastIndexOf(".")+1, nameWithoutPrefix.length());
 
 		String pathWithNameWithoutPrefix = path+"\\"+name;
-		String pathWithNameWithTxtPrefix = path+"\\"+name+".txt";
+		String pathWithNameWithTxtPrefix = path+"\\"+name+".txt"; 
+		
 		String nameWithTxtPrefix = name+".txt";
 		String content = "";
 
-		for (Value v : value) {
-			if(JimpleUtils.equals(valueType, CharType.v())) {
-				content += CharConstant.v(Integer.parseInt(v.toString()));
-			} else {
-				content = v + " ";
+		if(value.length != 0) {
+			for (Value v : value) {
+				if(JimpleUtils.equals(valueType, CharType.v())) {
+					content += CharConstant.v(Integer.parseInt(v.toString()));
+				} else {
+					content = v + " ";
+				}
 			}
+		} else {
+			if(JimpleUtils.equals(valueType, CharType.v())) {
+				SecureRandom sr = new SecureRandom();
+				IntStream stream = sr.ints(100, 33, 126);
+				for(int i : stream.toArray()) {
+					content += CharConstant.v(i);				
+				}
+			} 
 		}
+		
 		try {
+			
 			Path filePath = Paths.get(pathWithNameWithTxtPrefix);
 			if (!java.nio.file.Files.exists(filePath)) {
 				File f = new File(filePath.toUri());
@@ -161,14 +174,14 @@ public class HardCodedPatch extends AbstractPatch {
 			}
 
 			java.nio.file.Files.write(filePath, content.getBytes());
-		} catch (IOException e) {
-			e.printStackTrace();
+		} catch (IOException | InvalidPathException e) {
+			throw new RepairException("A problem occurs during file creation for the hard coded value" + e.getMessage());
 		}
 
 		return nameWithTxtPrefix;
 	}
 
-	private Map<Local, List<Unit>> createReadContentFromFile(SootClass clazz, Local arrayLocal, String fileName) {
+	private Map<Local, List<Unit>> createReadContentFromFile(SootClass clazz, Local arrayLocal, String fileName) throws GenerationException {
 		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 		List<Unit> generatedUnitList = Lists.newArrayList();
 
@@ -192,7 +205,7 @@ public class HardCodedPatch extends AbstractPatch {
 		RefType buffReaderRefType = RefType.v("java.io.BufferedReader");
 		SootClass buffReaderClass = buffReaderRefType.getSootClass();
 		
-		Local clazzLocal = localGenerator.generateFreshLocal(clazzRefType);
+		Local clazzLocal = localGenerator.generateFreshLocal(clazzRefType, Utils.getAppropriateVarName(clazzClass.getName()));
 		SootMethod getClass = objectClass.getMethod("java.lang.Class getClass()");
 		Unit getClassCall = callGenerator.generateCallUnits(JimpleUtils.getLocalByName(body, "this"), clazzLocal, getClass).values().iterator().next().get(0);
 
@@ -231,6 +244,10 @@ public class HardCodedPatch extends AbstractPatch {
 			loop = readOther(buffReaderLocal, arrayLocal);
 		}
 		
+		SootMethod fileReaderClose = fileReaderClass.getMethod("void close()");
+		Unit closeCall = callGenerator.generateCallUnits(fileReaderLocal, null, fileReaderClose).values().iterator().next().get(0);
+
+		
 		generatedUnitList.add(getClassCall);
 		generatedUnitList.add(filePathAssignment);
 		generatedUnitList.add(getResourceCall);
@@ -238,12 +255,13 @@ public class HardCodedPatch extends AbstractPatch {
 		generatedUnitList.addAll(fileReaderInitCall.values().iterator().next());
 		generatedUnitList.addAll(buffReaderCall.values().iterator().next());
 		generatedUnitList.addAll(loop);
+		generatedUnitList.add(closeCall);
 		generatedUnits.put(arrayLocal, generatedUnitList);
 		
 		return generatedUnits;
 	}
 
-	private List<Unit> readChar(Local buffReaderLocal, Local arrayLocal) {
+	private List<Unit> readChar(Local buffReaderLocal, Local arrayLocal) throws GenerationException {
 		List<Unit> generatedUnitList = Lists.newArrayList();
 
 		RefType buffReaderRefType = RefType.v("java.io.BufferedReader");
@@ -298,7 +316,7 @@ public class HardCodedPatch extends AbstractPatch {
 		return generatedUnitList;
 	}
 
-	private List<Unit> readOther(Local buffReaderLocal, Local arrayLocal) {
+	private List<Unit> readOther(Local buffReaderLocal, Local arrayLocal) throws GenerationException {
 		List<Unit> generatedUnitList = Lists.newArrayList();
 
 		RefType stringRefType = RefType.v("java.lang.String");
@@ -452,13 +470,14 @@ public class HardCodedPatch extends AbstractPatch {
 	public String toPatchString() {
 		StringBuilder builder = new StringBuilder();
 		builder.append("\n__________[HardCodedPatch]__________\n");
-		builder.append("Class: \t\t" + error.getErrorLocation().getMethod().getDeclaringClass().toString() + "\n");
+		builder.append("Repaired in Round: \t" + ErrorScheduler.round+ "\n");
+		builder.append("Class: \t" + error.getErrorLocation().getMethod().getDeclaringClass().toString() + "\n");
 		builder.append("Method: \t" + error.getErrorLocation().getMethod().getSignature() + "\n");
-		builder.append("Error: \t\t" + error.getClass().getSimpleName() + "\n");
+		builder.append("Error: \t" + error.getClass().getSimpleName() + "\n");
 		builder.append("CrySLRule: \t" + entity.getRule().getClassName() + "\n");
 		builder.append("Message: \t" + error.toErrorMarkerString() + "\n");
-		builder.append("Patch:\t\t"+patch+"\n");
-		builder.append("________________________________________\n");
+		builder.append("Patch: \t"+patch+"\n");
+		builder.append("__________________________________________");
 		return builder.toString();
 	}
 
