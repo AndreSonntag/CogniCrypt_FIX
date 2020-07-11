@@ -4,7 +4,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.commons.collections4.CollectionUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import com.google.common.collect.Lists;
 
@@ -12,13 +13,12 @@ import crypto.interfaces.ICrySLPredicateParameter;
 import crypto.rules.CrySLCondPredicate;
 import crypto.rules.CrySLObject;
 import crypto.rules.StateNode;
-import de.upb.cognicryptfix.exception.path.NoPathException;
+import de.upb.cognicryptfix.exception.path.EmptyPathListException;
 import de.upb.cognicryptfix.exception.path.PathException;
-import de.upb.cognicryptfix.utils.Utils;
-import soot.Scene;
-import soot.Type;
 
 public class CrySLPredicate {
+
+	private static final Logger LOGGER = LogManager.getLogger(CrySLPredicate.class);
 
 	private crypto.rules.CrySLPredicate predicate_;
 	private String predicateName;
@@ -33,32 +33,33 @@ public class CrySLPredicate {
 		this.predicateName = predicate_.getPredName();
 		this.predicateParameters = extractPredicateParameters();
 		this.generationPaths = Lists.newLinkedList();
-		this.negated = predicate_.isNegated(); 
+		this.negated = predicate_.isNegated();
 	}
 
-	public List<LinkedList<CrySLMethodCall>> getPaths() throws PathException{
+	public List<LinkedList<CrySLMethodCall>> getPaths() throws PathException {
 		if (generationPaths.isEmpty()) {
 			generationPaths = calcPaths();
 		}
-		
+
 		return generationPaths;
 	}
 
-	private List<LinkedList<CrySLMethodCall>> calcPaths() throws PathException {
+	private List<LinkedList<CrySLMethodCall>> calcPaths() throws PathException{
 		List<LinkedList<CrySLMethodCall>> paths = Lists.newArrayList();
-		
-		if (predicate_ instanceof CrySLCondPredicate) {
-			CrySLCondPredicate conPred = (CrySLCondPredicate) predicate_;
-			Set<StateNode> afterStates = conPred.getConditionalMethods();
-			paths = producer.getFSM().calcBestPathsForPredicateGenerationFromState(afterStates.iterator().next(), predicateParameters);
-		} else {
-			paths = producer.getFSM().calcBestPathsForPredicateGenerationFromFinalStates(predicateParameters);
-		
+
+		try {
+			if (predicate_ instanceof CrySLCondPredicate) {
+				CrySLCondPredicate conPred = (CrySLCondPredicate) predicate_;
+				Set<StateNode> afterStates = conPred.getConditionalMethods();
+				paths = producer.getFSM().calcPathsForPredicateGenerationFromState(afterStates.iterator().next(),
+						predicateParameters);
+			} else {
+				paths = producer.getFSM().calcPathsForPredicateGenerationFromFinalStates(predicateParameters);
+			}
+		} catch (EmptyPathListException e) {
+			LOGGER.error(producer.getRule().getClassName()+": all calculated generation paths for "+predicateName+" are not valid!");
 		}
-		
-		if(CollectionUtils.isEmpty(paths)) {
-			throw new NoPathException("No path could be calculated for "+toString());
-		}
+
 		return paths;
 	}
 
@@ -102,7 +103,7 @@ public class CrySLPredicate {
 		builder.append(",\n predicateName=");
 		builder.append(predicateName);
 		builder.append(",\n predicateParameters=");
-		builder.append(predicateParameters+"]");
+		builder.append(predicateParameters + "]");
 		return builder.toString();
 	}
 }

@@ -35,10 +35,6 @@ public class CrySLMethodCallTransition{
 		StringBuilder builder = new StringBuilder();
 		builder.append("CrySLMethodCallTransition\n [call=");
 		builder.append(call);
-		builder.append(",\n requiredUserInteractions=");
-		builder.append(call.getCallCriteria().getRequiredUserInteractions());
-		builder.append(",\n requiredRefTypeGenerations=");
-		builder.append(call.getCallCriteria().getRequiredRefTypeGenerations());
 		builder.append(",\n from=");
 		builder.append(from.getState());
 		builder.append(",\n to=");

@@ -60,8 +60,7 @@ public class CrySLEntityPool {
 			for(crypto.rules.CrySLPredicate predicate_ : entity.getRequiredPredicates_()) {
 				for(CrySLPredicate predicate : predicates) {
 					if(predicate.getPredicate_().equals(predicate_)){
-						entity.addRequiredPredicate
-						(new CrySLVariable(predicate_.getParameters().get(0).getName(),Utils.getType(entity.getRule(), predicate_.getParameters().get(0).getName())), predicate);
+						entity.addRequiredPredicate(new CrySLVariable(predicate_.getParameters().get(0).getName(),Utils.getType(entity.getRule(), predicate_.getParameters().get(0).getName())), predicate);
 					}
 				}
 			}	

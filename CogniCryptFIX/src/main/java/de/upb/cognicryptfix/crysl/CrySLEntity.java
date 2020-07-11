@@ -10,13 +10,16 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 import crypto.interfaces.ISLConstraint;
+import crypto.rules.CrySLConstraint;
 import crypto.rules.CrySLRule;
 import crypto.rules.CrySLValueConstraint;
+import de.upb.cognicryptfix.Constants;
 import de.upb.cognicryptfix.crysl.fsm.CrySLCallFSM;
 import de.upb.cognicryptfix.crysl.pool.CrySLEntityPool;
 import de.upb.cognicryptfix.crysl.pool.CrySLVariablePool;
 import de.upb.cognicryptfix.exception.generation.NoInterfaceImplementerException;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
+import de.upb.cognicryptfix.utils.Utils;
 import soot.Scene;
 import soot.SootClass;
 import soot.Type;
@@ -26,7 +29,7 @@ public class CrySLEntity {
 	private CrySLRule rule;
 	private CrySLCallFSM fsm;
 	private CrySLVariablePool pool;
-	
+
 	private List<CrySLPredicate> ensuredPredicates;
 	private List<CrySLPredicate> requiredPredicates;
 	private List<CrySLPredicate> negatedPredicates;
@@ -45,7 +48,7 @@ public class CrySLEntity {
 		this.variableRequiredPredicateMap = Maps.newHashMap();
 		generateEnsuredPredicates();
 	}
-	
+
 	private void generateEnsuredPredicates() {
 		for (crypto.rules.CrySLPredicate predicate : rule.getPredicates()) {
 			if (!predicate.isNegated()) {
@@ -57,7 +60,7 @@ public class CrySLEntity {
 			}
 		}
 	}
-	
+
 	public void addRequiredPredicate(CrySLVariable var, CrySLPredicate predicate) {
 		requiredPredicates.add(predicate);
 		if (variableRequiredPredicateMap.containsKey(var)) {
@@ -76,41 +79,39 @@ public class CrySLEntity {
 			return true;
 		}
 	}
-	
-	public List<CrySLPredicate> getRequiredPredicateForVariableByType(CrySLVariable variable) {	
-		
+
+	public List<CrySLPredicate> getRequiredPredicateForVariableByType(CrySLVariable variable) {
+
 		if (variableRequiredPredicateMap.get(variable) == null) {
 			return Lists.newArrayList();
 		} else {
 			List<CrySLPredicate> firstChoice = Lists.newArrayList();
 			List<CrySLPredicate> secondChoice = Lists.newArrayList();
-			
-			List<CrySLPredicate> calcPredicates = calcRequiredPredicatesBySatisfiedConstraints(variable);
-			
+
+			List<CrySLPredicate> calcPredicates = variableRequiredPredicateMap.get(variable);
 			for (CrySLPredicate predicate : Lists.newArrayList(calcPredicates)) {
 				Type firstPredicateParameterType = predicate.getPredicateParameters().get(0).getType();
-								
-				if(JimpleUtils.equals(variable.getType(), firstPredicateParameterType)) {
-					firstChoice.add(predicate);
-				} else if(JimpleUtils.isSubClassOrImplementer(variable.getType(),firstPredicateParameterType)) {
-					secondChoice.add(predicate);
-				} 
-			}
 
-			if(JimpleUtils.isHighestSuperCryptoInterfaceOrAbstractClass(variable.getType())) {
+				if (JimpleUtils.equals(variable.getType(), firstPredicateParameterType)) {
+					firstChoice.add(predicate);
+				} else if (JimpleUtils.isSubClassOrImplementer(variable.getType(), firstPredicateParameterType)) {
+					secondChoice.add(predicate);
+				}
+			}
+			if (JimpleUtils.isHighestSuperCryptoInterfaceOrAbstractClass(variable.getType()) || JimpleUtils.equals(variable.getType(),Scene.v().getType("java.security.Key"))) {
 				return secondChoice;
 			} else {
-				if(!firstChoice.isEmpty()) {
+				if (!firstChoice.isEmpty()) {
 					return firstChoice;
 				} else if (!secondChoice.isEmpty()) {
 					return secondChoice;
 				} else {
 					return Lists.newArrayList();
-				}			
+				}
 			}
 		}
 	}
-	
+
 	private List<CrySLPredicate> calcRequiredPredicatesBySatisfiedConstraints(CrySLVariable var){
 		List<ISLConstraint> constraints = rule.getConstraints();
 		List<crypto.rules.CrySLPredicate> predicateConstraints = Lists.newArrayList();
@@ -121,9 +122,23 @@ public class CrySLEntity {
 				if(predCon.getConstraint() instanceof CrySLValueConstraint) {
 					predicateConstraints.add(predCon);
 				}
+			} else if(con instanceof crypto.rules.CrySLConstraint) {
+				crypto.rules.CrySLConstraint crySLCon = (crypto.rules.CrySLConstraint) con;
+				if(crySLCon.getOperator() == crypto.rules.CrySLConstraint.LogOps.or) {
+					List<ISLConstraint> innerCons = Lists.newArrayList(crySLCon.getLeft());
+					innerCons.add(crySLCon.getRight());
+					for(ISLConstraint con_ : innerCons) {
+						if(con_ instanceof crypto.rules.CrySLPredicate) {
+							crypto.rules.CrySLPredicate predCon = (crypto.rules.CrySLPredicate) con_;
+							if(predCon.getConstraint() instanceof CrySLValueConstraint) {
+								predicateConstraints.add(predCon);
+							}
+						}
+					}
+				}
 			}
 		}
-		
+
 		if(!predicateConstraints.isEmpty()) {		
 			Set<crypto.rules.CrySLPredicate> satisfiedPreds = Sets.newHashSet();
 			for(crypto.rules.CrySLPredicate pred : predicateConstraints) {
@@ -154,12 +169,13 @@ public class CrySLEntity {
 			return Lists.newArrayList(variableRequiredPredicateMap.get(var));
 	
 	}
-	
-	//TODO: rename!
-	public List<CrySLPredicate> canProducedByPredicates(){
-		List<CrySLPredicate> producerPredicates= Lists.newArrayList();
-		if(isInterfaceOrAbstract()) {
-			List<CrySLPredicate> predicates = CrySLEntityPool.getInstance().getPredicateCandidatesWhichProduceType(clazz.getType());
+
+	// TODO: rename!
+	public List<CrySLPredicate> canProducedByPredicates() {
+		List<CrySLPredicate> producerPredicates = Lists.newArrayList();
+		if (isInterfaceOrAbstract()) {
+			List<CrySLPredicate> predicates = CrySLEntityPool.getInstance()
+					.getPredicateCandidatesWhichProduceType(clazz.getType());
 			if (!predicates.isEmpty()) {
 				producerPredicates = predicates;
 			}
@@ -168,9 +184,9 @@ public class CrySLEntity {
 	}
 
 	public boolean isInterfaceOrAbstract() {
-		if(clazz.isInterface()){
+		if (clazz.isInterface()) {
 			return true;
-		} else if(clazz.isAbstract()) {
+		} else if (clazz.isAbstract()) {
 			try {
 				return JimpleUtils.getImplementingClassAndInitMethod(clazz) != null ? false : true;
 			} catch (NoInterfaceImplementerException e) {
@@ -180,7 +196,7 @@ public class CrySLEntity {
 			return false;
 		}
 	}
-	
+
 	public CrySLRule getRule() {
 		return rule;
 	}
@@ -197,18 +213,37 @@ public class CrySLEntity {
 		return ensuredPredicates;
 	}
 
-	public List<crypto.rules.CrySLPredicate> getRequiredPredicates_() {
-		return rule.getRequiredPredicates();
+	public List<crypto.rules.CrySLPredicate> getRequiredPredicates_() {	
+		List<crypto.rules.CrySLPredicate> reqPredicates = rule.getRequiredPredicates();
+		for(ISLConstraint con : rule.getConstraints()) {
+			if(con instanceof crypto.rules.CrySLConstraint) {
+				crypto.rules.CrySLConstraint crySLCon = (crypto.rules.CrySLConstraint) con;
+				if(crySLCon.getOperator() == crypto.rules.CrySLConstraint.LogOps.or) {
+					List<ISLConstraint> innerCons = Lists.newArrayList(crySLCon.getLeft());
+					innerCons.add(crySLCon.getRight());
+					for(ISLConstraint con_ : innerCons) {
+						if(con_ instanceof crypto.rules.CrySLPredicate) {
+							crypto.rules.CrySLPredicate predCon = (crypto.rules.CrySLPredicate) con_;
+							if(!Constants.PREDEFINED_PREDS.contains(predCon.getName())) {
+								reqPredicates.add(predCon);
+							}
+							
+						}
+					}
+				}
+			}
+		}		
+		return reqPredicates;
 	}
 
 	public SootClass getSootClass() {
 		return clazz;
 	}
-		
+
 	public CrySLVariable getVariableByName(String name) {
 		return pool.getVariableByName(name);
 	}
-	
+
 	public List<CrySLPredicate> getNegatedPredicates() {
 		return negatedPredicates;
 	}

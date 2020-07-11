@@ -20,25 +20,31 @@ import crypto.rules.CrySLRule;
  */
 public class CrySLReaderUtils {
 
-	private static final Logger logger = LogManager.getLogger(CrySLReaderUtils.class);
+	private static final Logger LOGGER = LogManager.getLogger(CrySLReaderUtils.class);
 
 	public static List<CrySLRule> readRulesFromSourceFiles(final String folderPath) {
 
 		File temp = null;
 		try {
+			LOGGER.info("Read rules from "+folderPath);
 			CrySLModelReader analysisCrySLReader = new CrySLModelReader();
 			List<CrySLRule> rules = new ArrayList<CrySLRule>();
 			File[] files = new File(folderPath).listFiles();
 			for (File file : files) {
 				if (file != null && file.getName().endsWith(".crysl")) {
 					temp = file;
-					logger.debug("read: "+file.getName());
-					rules.add(analysisCrySLReader.readRule(file));
+//					logger.debug("read: "+file.getName());
+					CrySLRule rule = analysisCrySLReader.readRule(file);
+					if(!rule.getClassName().equals("void")) {
+						rules.add(rule);
+					} else {
+						LOGGER.error("Rule: "+file.getName()+" is a void rule!");
+					}
 				}
 			}
 			return rules;
 		} catch (MalformedURLException e) {
-			logger.error("Problem with rule: "+temp.getAbsolutePath());
+			LOGGER.error("Problem with rule: "+temp.getAbsolutePath());
 			e.printStackTrace();
 		}
 		return null;

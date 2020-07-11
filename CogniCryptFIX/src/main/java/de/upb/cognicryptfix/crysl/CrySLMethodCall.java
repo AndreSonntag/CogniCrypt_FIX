@@ -9,8 +9,6 @@ import crypto.rules.CrySLMethod;
 import crypto.rules.CrySLRule;
 import de.upb.cognicryptfix.crysl.pool.CrySLVariablePool;
 import de.upb.cognicryptfix.utils.Utils;
-import soot.RefType;
-import soot.Scene;
 import soot.SootMethod;
 
 /**
@@ -25,12 +23,20 @@ public class CrySLMethodCall {
 	private CrySLVariablePool pool;
 	private List<CrySLVariable> callParameters;
 	private CrySLVariable callReturn;
-	private CrySLMethodCallCriteria callCriteria;
-	private int requiredUserInteractions;
-	private int requiredRefTypeGenerations;
 	private boolean initCall;
-	private boolean negatesPredicate;
+	private boolean afterPredicateCall;
 
+	public CrySLMethodCall(CrySLMethodCall copy) {
+		this.rule = copy.rule;
+		this.sootMethod = copy.sootMethod;
+		this.crySLMethod = copy.crySLMethod;
+		this.pool = copy.pool;
+		this.callParameters = copy.callParameters;
+		this.callReturn = copy.callReturn;
+		this.initCall = copy.initCall;
+		this.afterPredicateCall = copy.afterPredicateCall;
+	}
+	
 	public CrySLMethodCall(CrySLRule rule, SootMethod sootMethod, CrySLMethod cryslMethod, CrySLVariablePool pool) {
 		this.rule = rule;
 		this.sootMethod = sootMethod;
@@ -39,34 +45,7 @@ public class CrySLMethodCall {
 		this.pool = pool;
 		this.callParameters = resolveCallParameters();	
 		this.callReturn = resolveCallReturn();
-		this.requiredUserInteractions = countUserIteractions();
-		this.requiredRefTypeGenerations = countRefTypeParamterGeneration();
-		this.callCriteria = new CrySLMethodCallCriteria(requiredUserInteractions,requiredRefTypeGenerations);
-		this.negatesPredicate = false;
-	}
-	
-	private int countRefTypeParamterGeneration() {
-		int countRequiredRefTypeGenerations = 0;
-		for (CrySLVariable parameter : callParameters) {
-			if (parameter.getType() instanceof RefType && parameter.getType() != Scene.v().getType("java.lang.String")) {
-				countRequiredRefTypeGenerations++;
-			}
-		}
-		return countRequiredRefTypeGenerations;
-	}
-
-	private int countUserIteractions() {
-		int countRequiredUserInteractions = 0;
-		for (CrySLVariable parameter : callParameters) {
-			if (parameter.getName().equals("_")) {
-				countRequiredUserInteractions += 2;
-			} else {
-				if(pool.getVariableConstraint(parameter) == null ) {
-					countRequiredUserInteractions++;
-				}
-			}
-		}
-		return countRequiredUserInteractions < 0 ? 0 : countRequiredUserInteractions;
+		this.afterPredicateCall = false;
 	}
 	
 	private List<CrySLVariable> resolveCallParameters() {
@@ -106,10 +85,6 @@ public class CrySLMethodCall {
 		return callReturn;
 	}
 
-	public CrySLMethodCallCriteria getCallCriteria() {
-		return callCriteria;
-	}
-	
 	public boolean isInitCall() {
 		return sootMethod.isConstructor() || rule.getClassName().equals(sootMethod.getReturnType().toQuotedString()) ? true : false;
 	}
@@ -118,15 +93,17 @@ public class CrySLMethodCall {
 		return rule;
 	}
 	
-	public boolean isNegatesPredicate() {
-		return negatesPredicate;
+	public CrySLVariablePool getPool() {
+		return pool;
+	}
+	
+	public boolean isAfterPredicateCall() {
+		return afterPredicateCall;
 	}
 
-	public void setNegatesPredicate(boolean negatesPredicate) {
-		this.negatesPredicate = negatesPredicate;
+	public void setAfterPredicateCall(boolean afterPredicateCall) {
+		this.afterPredicateCall = afterPredicateCall;
 	}
-
-
 
 	@Override
 	public String toString() {

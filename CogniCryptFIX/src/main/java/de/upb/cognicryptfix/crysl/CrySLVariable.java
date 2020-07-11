@@ -109,8 +109,4 @@ public class CrySLVariable {
 		builder.append("]");
 		return builder.toString();
 	}
-
-	
-
-	
 }
