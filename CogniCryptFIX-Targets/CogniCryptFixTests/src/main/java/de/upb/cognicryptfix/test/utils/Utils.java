@@ -1,12 +1,13 @@
 package de.upb.cognicryptfix.test.utils;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 
@@ -42,18 +43,18 @@ public class Utils {
 		return ks;
 	}
 	
-	public KeyManager[] getKeyManagers(KeyStore store) throws UnrecoverableKeyException, KeyStoreException, NoSuchAlgorithmException {
+	public KeyManager[] getKeyManagers() throws UnrecoverableKeyException, KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException {
 		KeyManager[] manager = null;
 		KeyManagerFactory factory = KeyManagerFactory.getInstance("PKIX");
-		factory.init(store, readFileContent("pathToPasswordFile"));
+		factory.init(createKeyStore(), readFileContent("pathToPasswordFile"));
 		manager = factory.getKeyManagers();
 		return manager;
 	}
 	
-	public TrustManager[] getTrustManager(KeyStore store) throws NoSuchAlgorithmException, KeyStoreException {
+	public TrustManager[] getTrustManager() throws NoSuchAlgorithmException, KeyStoreException, CertificateException, IOException {
 		TrustManager[] managers = null;
 		TrustManagerFactory factory = TrustManagerFactory.getInstance("PKIX");
-		factory.init(store);
+		factory.init(createKeyStore());
 		managers = factory.getTrustManagers();
 		return managers;
 	}
