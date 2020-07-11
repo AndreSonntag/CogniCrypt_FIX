@@ -19,6 +19,7 @@ import de.upb.cognicryptfix.crysl.CrySLMethodCall;
 import de.upb.cognicryptfix.crysl.CrySLPredicate;
 import de.upb.cognicryptfix.crysl.CrySLPredicateFilter;
 import de.upb.cognicryptfix.crysl.CrySLVariable;
+import de.upb.cognicryptfix.exception.generation.GenerationException;
 import de.upb.cognicryptfix.exception.generation.crysl.CrySLGenerationException;
 import de.upb.cognicryptfix.exception.generation.crysl.EmptyPredicateListException;
 import de.upb.cognicryptfix.exception.generation.crysl.NoPredicateEnsurerException;
@@ -27,6 +28,7 @@ import de.upb.cognicryptfix.generator.JimpleCodeGeneratorByRule;
 import de.upb.cognicryptfix.generator.jimple.JimpleAssignGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleLocalGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
+import de.upb.cognicryptfix.tag.AfterPredicateTag;
 import de.upb.cognicryptfix.utils.Utils;
 import soot.Body;
 import soot.Local;
@@ -47,52 +49,33 @@ public class JimplePredicateGenerator {
 		this.assignGenerator = new JimpleAssignGenerator();
 		this.codeGenerator = codeGenerator;
 	}
-	
-	public Map<Local, List<Unit>> generatePredicateUnits(CrySLEntity entity, CrySLVariable variable, Local usageLocal) throws CrySLGenerationException, PathException {	
-		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
-		
-		if (!entity.requiresPredicate(variable)) {
-			throw new CrySLGenerationException("Variable: " +variable.getName()+ " doesn't require a predicate");
-		}
-		
-		List<CrySLPredicate> requiredPredicates = entity.getRequiredPredicateForVariableByType(variable);			
-		if(requiredPredicates.isEmpty()) {
-			throw new NoPredicateEnsurerException("No Rule provides following predicate: "+requiredPredicates.toString());
-		}
-			
-		generatedUnits.putAll(generatePredicateUnits(requiredPredicates, usageLocal));				
-		return generatedUnits;
-	}
-	
-	public Map<Local, List<Unit>> generatePredicateUnits(List<CrySLPredicate> predicates, Local... usageLocal) throws CrySLGenerationException, PathException{
-		
+
+	public Map<Local, List<Unit>> generatePredicateUnits(List<CrySLPredicate> predicates, Local... usageLocal)
+			throws PathException, GenerationException {
+
 		if (CollectionUtils.isEmpty(predicates)) {
 			throw new EmptyPredicateListException("Predicate list is empty");
-		} 
+		}
 
-		Entry<CrySLPredicate, LinkedList<CrySLMethodCall>> predicateEntry = CrySLPredicateFilter.applyFilters(predicates);
+		Entry<CrySLPredicate, LinkedList<CrySLMethodCall>> predicateEntry = CrySLPredicateFilter.applyPredicateCriteriaFilters(predicates);
 		return generatePredicateUnits(predicateEntry.getKey(), predicateEntry.getValue(), usageLocal);
 	}
 
-	private Map<Local, List<Unit>> generatePredicateUnits(CrySLPredicate predicate, List<CrySLMethodCall> predicatePath, Local... usageLocal) throws CrySLGenerationException, PathException {
-		LOGGER.debug("Generate Predicate: "+predicate+"\n Path: "+predicatePath.toString());
-		
+	private Map<Local, List<Unit>> generatePredicateUnits(CrySLPredicate predicate, List<CrySLMethodCall> predicatePath, Local... usageLocal) throws PathException, GenerationException {
+		LOGGER.debug("Generate Predicate: " + predicate + "\n Path: " + predicatePath.toString());
+
 		Map<Local, List<Unit>> generatedUnitsForPredicate = Maps.newLinkedHashMap();
 		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 		Local initLocal = null;
 		Local predicateLocal = null;
 		CrySLVariable firstPredicateParamter = predicate.getPredicateParameters().get(0);
-		
-		//requried i.e. preparedKeyMaterial[]  
+
+		// requried i.e. preparedKeyMaterial[]
 		if (predicate.getProducer().isInterfaceOrAbstract()) {
-			LOGGER.debug(predicate.getProducer().getSootClass()+" is an interface, and needs to be instantiated by an implementer!");
-
+			LOGGER.debug(predicate.getProducer().getSootClass()+ " is an interface, and needs to be instantiated by an implementer!");
 			List<CrySLPredicate> producerPredicates = predicate.getProducer().canProducedByPredicates();
-			producerPredicates = CrySLPredicateFilter.filterPredicatesByPathWihtoutUseOfSpecifiedPredicate(predicate, producerPredicates);
-			
-			LOGGER.debug("Possible implementer: "+producerPredicates);
-
-			generatedUnitsForPredicate.putAll(generatePredicateUnits(producerPredicates));
+			Entry<CrySLPredicate, LinkedList<CrySLMethodCall>> predicateEntry = CrySLPredicateFilter.applyPredicateCriteriaFilters(producerPredicates, predicate);
+			generatedUnitsForPredicate.putAll(generatePredicateUnits(predicateEntry.getKey(), predicateEntry.getValue()));
 			initLocal = generatedUnitsForPredicate.keySet().iterator().next();
 		}
 
@@ -105,21 +88,31 @@ public class JimplePredicateGenerator {
 				generatedUnitsForPredicate.put(initLocal, Lists.newArrayList());
 				generatedCallUnits = codeGenerator.generateCallWithParameter(initLocal, call, true);
 
+				if (call.isAfterPredicateCall()) {
+					for (Unit u : Utils.summarizeUnitLists(generatedCallUnits.values())) {
+						u.addTag(new AfterPredicateTag());
+					}
+				}
+
 				if (predicateLocal == null && firstPredicateParamter.getName().equals("this")) {
 					predicateLocal = initLocal;
 				} else {
-					if (predicateLocal == null && containsPredicateLocal(firstPredicateParamter, generatedCallUnits.keySet())) {
+					if (predicateLocal == null
+							&& containsPredicateLocal(firstPredicateParamter, generatedCallUnits.keySet())) {
 						predicateLocal = getPredicateLocal(firstPredicateParamter, generatedCallUnits.keySet());
 					}
 				}
 			} else {
 				if (call.getCallReturn().equals(firstPredicateParamter)) {
 					generatedCallUnits = codeGenerator.generateCallWithParameter(initLocal, call, true);
+
 				} else if (call.getCallParameters().contains(firstPredicateParamter)) {
 					generatedCallUnits = codeGenerator.generateCallWithParameter(initLocal, call, false);
 					if (usageLocal.length > 0) {
-						if (JimpleUtils.equals(firstPredicateParamter.getType(), Scene.v().getType("java.lang.String"))|| !(firstPredicateParamter.getType() instanceof RefType)) {
-							Local genPredLocal = Lists.newArrayList(generatedCallUnits.keySet()).get(call.getParamterIndex(firstPredicateParamter));
+						if (JimpleUtils.equals(firstPredicateParamter.getType(), Scene.v().getType("java.lang.String"))
+								|| !(firstPredicateParamter.getType() instanceof RefType)) {
+							Local genPredLocal = Lists.newArrayList(generatedCallUnits.keySet())
+									.get(call.getParamterIndex(firstPredicateParamter));
 							Unit assignStmt = assignGenerator.generateAssignStmt(genPredLocal, usageLocal[0]);
 							generatedCallUnits.get(genPredLocal).set(0, assignStmt);
 							predicateLocal = usageLocal[0];
@@ -127,6 +120,12 @@ public class JimplePredicateGenerator {
 					}
 				} else {
 					generatedCallUnits = codeGenerator.generateCallWithParameter(initLocal, call, false);
+				}
+
+				if (call.isAfterPredicateCall()) {
+					for (Unit u : Utils.summarizeUnitLists(generatedCallUnits.values())) {
+						u.addTag(new AfterPredicateTag());
+					}
 				}
 
 				if (predicateLocal == null && containsPredicateLocal(firstPredicateParamter, generatedCallUnits.keySet())) {

@@ -39,7 +39,6 @@ public class JimpleInvokeGenerator {
 		SootMethodRef ref = method.makeRef();
 		InvokeExpr invokeExpr = null;
 
-		
 		if (method.isStatic()) {
 			invokeExpr = Jimple.v().newStaticInvokeExpr(ref, Arrays.asList(args));
 		} else if (method.isConstructor()) {

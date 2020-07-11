@@ -9,7 +9,9 @@ import org.apache.commons.collections4.CollectionUtils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
+import de.upb.cognicryptfix.exception.generation.GenerationException;
 import de.upb.cognicryptfix.exception.generation.NoInterfaceImplementerException;
+import de.upb.cognicryptfix.utils.Utils;
 import soot.ArrayType;
 import soot.Body;
 import soot.Local;
@@ -38,7 +40,7 @@ public class JimpleParameterGenerator {
 		this.callGenerator = new JimpleCallGenerator(body);
 	}
 	
-	public Map<Local, List<Unit>> generateParameterUnits(SootMethod method, List<String> names, List<Object> values) throws NoInterfaceImplementerException {
+	public Map<Local, List<Unit>> generateParameterUnits(SootMethod method, List<String> names, List<Object> values) throws GenerationException {
 
 		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 		List<Type> types = method.getParameterTypes();
@@ -73,7 +75,7 @@ public class JimpleParameterGenerator {
 		return generatedUnits;
 	}
 
-	private Map<Local, List<Unit>> generateParameterUnit(Type type, String name, Object value) throws NoInterfaceImplementerException {
+	private Map<Local, List<Unit>> generateParameterUnit(Type type, String name, Object value) throws GenerationException {
 		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 
 		if (type instanceof PrimType || JimpleUtils.equals(type, Scene.v().getType("java.lang.String"))) {
@@ -109,6 +111,10 @@ public class JimpleParameterGenerator {
 				initMethod = initClazz.getMethodByName("");
 			}
 				
+			if(name.equals("")) {
+				name = Utils.getAppropriateVarName(initClazz.getName());
+			}
+			
 			Local initLocal = localGenerator.generateFreshLocal(initClazz.getType(), name);
 		
 			generatedUnits.put(initLocal, Lists.newArrayList());

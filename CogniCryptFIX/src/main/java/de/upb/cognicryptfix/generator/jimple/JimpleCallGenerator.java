@@ -6,11 +6,13 @@ import java.util.Map;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
+import de.upb.cognicryptfix.exception.generation.GenerationException;
 import de.upb.cognicryptfix.tag.RequiredExceptionHandlingTag;
 import soot.Body;
 import soot.Local;
 import soot.SootMethod;
 import soot.Unit;
+import soot.jbco.util.ThrowSet;
 import soot.jimple.InvokeStmt;
 import soot.tagkit.Tag;
 
@@ -30,13 +32,22 @@ public class JimpleCallGenerator {
 		this.assignGenerator = new JimpleAssignGenerator();
 	}
 
-	public Map<Local, List<Unit>> generateCallUnits(Local var, SootMethod method, Local... parameterLocals) {
+	public Map<Local, List<Unit>> generateCallUnits(Local var, SootMethod method, Local... parameterLocals) throws GenerationException {
 		return generateCallUnits(var, null, method, parameterLocals);
 	}
 
-	public Map<Local, List<Unit>> generateCallUnits(Local var, Local returnVar, SootMethod method, Local... parameterLocals) {
-		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
+	public Map<Local, List<Unit>> generateCallUnits(Local var, Local returnVar, SootMethod method, Local... parameterLocals) throws GenerationException {
 		
+		if(var == null|| method == null) {
+			throw new GenerationException("invoke Local or method signature empthy");
+		} else if(method.getParameterCount() > 0) {
+			if(parameterLocals == null || parameterLocals.length == 0) {
+				throw new GenerationException("Parameter empty");
+			}
+		}
+		
+		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
+	
 		if (method.isConstructor()) { //init call
 			generatedUnits.putAll(generateConstructorCallUnits(var, method, parameterLocals));
 		} else if (JimpleUtils.equals(var.getType(), method.getReturnType())) {// i.e. getInstance()

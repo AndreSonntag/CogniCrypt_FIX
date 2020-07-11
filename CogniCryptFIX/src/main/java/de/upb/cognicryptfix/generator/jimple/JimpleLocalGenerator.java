@@ -59,7 +59,7 @@ public class JimpleLocalGenerator {
 
 	}
 
-	private String findName(String name) {
+	public String findName(String name) {
 		StringBuilder sb = new StringBuilder(name);
 		Local existingLocaL = JimpleUtils.getLocalByName(body, name);
 		

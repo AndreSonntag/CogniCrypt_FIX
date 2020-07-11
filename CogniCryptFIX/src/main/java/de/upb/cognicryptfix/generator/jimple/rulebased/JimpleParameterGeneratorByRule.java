@@ -28,6 +28,7 @@ import de.upb.cognicryptfix.generator.jimple.JimpleCallGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleLocalGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleParameterGenerator;
 import de.upb.cognicryptfix.generator.jimple.JimpleUtils;
+import de.upb.cognicryptfix.utils.Utils;
 import soot.ArrayType;
 import soot.Body;
 import soot.Local;
@@ -39,6 +40,8 @@ import soot.SootMethod;
 import soot.Type;
 import soot.Unit;
 import soot.Value;
+import soot.tagkit.InnerClassTag;
+import soot.tagkit.Tag;
 
 /**
  * @author Andre Sonntag
@@ -66,18 +69,18 @@ public class JimpleParameterGeneratorByRule {
 		this.predicateGenerator = predicateGenerator;
 	}
 
-	public Map<Local, List<Unit>> generateParameterUnits(CrySLMethodCall call, Map<Integer, Local>... alreadyGeneratedParameter) throws GenerationException, PathException {
+	public Map<Local, List<Unit>> generateParameterUnits(CrySLMethodCall call,
+			Map<Integer, Local>... alreadyGeneratedParameter) throws GenerationException, PathException {
 		Map<Local, List<Unit>> generatedUnits = Maps.newLinkedHashMap();
 		boolean parameterAvailable = true;
-		
+
 		if (call.getCallParameters().size() == 0) {
 			return generatedUnits;
 		}
-		
-		if(alreadyGeneratedParameter.length == 0) {
+
+		if (alreadyGeneratedParameter.length == 0) {
 			parameterAvailable = false;
 		}
-		
 
 		LOGGER.debug("Call parameters to generate: " + call.getCallParameters());
 		CrySLEntity entity = pool.getEntityByClassName(call.getRule().getClassName());
@@ -85,8 +88,9 @@ public class JimpleParameterGeneratorByRule {
 		for (int i = 0; i < call.getCallParameters().size(); i++) {
 			CrySLVariable parameter = call.getCallParameters().get(i);
 
-			if(!parameterAvailable) {
+			if (!parameterAvailable) {
 				if (entity.requiresPredicate(parameter)) {
+					LOGGER.debug(parameter.toString() + " requires a predicate");
 					List<CrySLPredicate> requiredPredicates = entity.getRequiredPredicateForVariableByType(parameter);
 					if (requiredPredicates.isEmpty()) {
 						throw new NoPredicateEnsurerException(
@@ -94,14 +98,16 @@ public class JimpleParameterGeneratorByRule {
 					}
 					generatedUnits.putAll(predicateGenerator.generatePredicateUnits(requiredPredicates));
 				} else {
+					LOGGER.debug(parameter.toString() + " doesn't require a predicate");
 					generatedUnits.putAll(generateParameterUnit(parameter));
 				}
 			} else {
-				if(alreadyGeneratedParameter[0].containsKey(i)) {
+				if (alreadyGeneratedParameter[0].containsKey(i)) {
 					generatedUnits.put(alreadyGeneratedParameter[0].get(i), Lists.newArrayList());
 				} else {
 					if (entity.requiresPredicate(parameter)) {
-						List<CrySLPredicate> requiredPredicates = entity.getRequiredPredicateForVariableByType(parameter);
+						List<CrySLPredicate> requiredPredicates = entity
+								.getRequiredPredicateForVariableByType(parameter);
 						if (requiredPredicates.isEmpty()) {
 							throw new NoPredicateEnsurerException(
 									"No Rule provides following predicate: " + requiredPredicates.toString());
@@ -117,7 +123,7 @@ public class JimpleParameterGeneratorByRule {
 	}
 
 	private Map<Local, List<Unit>> generateParameterUnit(CrySLVariable variable)
-			throws CrySLGenerationException, NoInterfaceImplementerException, PathException {
+			throws PathException, GenerationException {
 		LOGGER.debug("Generate parameter: " + variable);
 
 		Map<Local, List<Unit>> generatedUnits = Maps.newHashMap();
@@ -129,7 +135,7 @@ public class JimpleParameterGeneratorByRule {
 		if (variableType instanceof PrimType
 				|| JimpleUtils.equals(variableType, Scene.v().getType("java.lang.String"))) {
 			Type primType = variableType;
-			Local primeLocal = localGenerator.generateFreshLocal(primType, variableName);
+			Local primeLocal = localGenerator.generateFreshLocal(primType, "varReplacer");
 
 			Value primeValue = null;
 			if (variableValue != null) {
@@ -173,6 +179,18 @@ public class JimpleParameterGeneratorByRule {
 				SootClass initClazz = null;
 				SootMethod initMethod = null;
 				init = JimpleUtils.getImplementingClassAndInitMethod(refTypeClazz);
+				if (init.getValue() == null) {
+					for (Tag t : refTypeClazz.getTags()) {
+						if (t instanceof InnerClassTag) {
+							InnerClassTag innerTag = (InnerClassTag) t;
+							String innerClassName = innerTag.getShortName();
+							String fullName = refTypeClazz.getName() + "$" + innerClassName;
+							SootClass innerClass = Scene.v().getSootClass(fullName);
+							init = JimpleUtils.getImplementingClassAndInitMethod(innerClass);
+							break;
+						}
+					}
+				}
 
 				if (init != null) {
 					initClazz = init.getKey();
@@ -180,6 +198,10 @@ public class JimpleParameterGeneratorByRule {
 				} else {
 					initClazz = Scene.v().getSootClass("java.lang.Object");
 					initMethod = initClazz.getMethodByName("");
+				}
+
+				if (variableName.equals("")) {
+					variableName = Utils.getAppropriateVarName(initClazz.getName());
 				}
 
 				Local initLocal = localGenerator.generateFreshLocal(initClazz.getType(), variableName);
