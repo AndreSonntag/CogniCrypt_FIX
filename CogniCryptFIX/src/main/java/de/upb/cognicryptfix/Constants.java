@@ -24,7 +24,9 @@ public class Constants {
 	public static final String JCE_PATH = System.getProperty("java.home") + File.separator + "lib" + File.separator + "jce.jar";
 	public final static List<String> NOT_SUPPORTED_PREDICATES = Arrays.asList("generatedManagerFactoryParameters");
 	public final static List<String> NOT_SUPPORTED_PARAMETER_TYPES = Arrays.asList("java.io.FileDescriptor", "java.security.KeyStore$LoadStoreParameter", "java.security.cert.Certificate");
-	public final static String REQUIRED_EXCEPTION_HANDLING_TAG = "de.upb.cognicryptfix.RequiredExceptionHandlingUnit";
-	public final static String ENSURED_PREDICATE_TAG= "de.upb.cognicryptfix.EnsuredPredicateTag";
-
+	public final static List<String> NOT_SUPPORTED_PREDICATE_PROVIDER = Arrays.asList("java.security.Key");
+	public final static String REQUIRED_EXCEPTION_HANDLING_TAG = "de.upb.cognicryptfix.tag.RequiredExceptionHandlingUnit";
+	public final static String ENSURED_PREDICATE_TAG= "de.upb.cognicryptfix.tag.EnsuredPredicateTag";
+	public final static String AFTER_PREDICATE_TAG= "de.upb.cognicryptfix.tag.AfterPredicateTag";
+	public final static List<String> PREDEFINED_PREDS = Arrays.asList("callTo", "noCallTo", "neverTypeOf", "length", "notHardCoded");
 }
