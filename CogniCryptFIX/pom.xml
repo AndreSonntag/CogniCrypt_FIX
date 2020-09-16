@@ -14,7 +14,7 @@
 		<guava.version>29.0-jre</guava.version>
 		<soot.version>4.1.0</soot.version>
 		<crysl.version>2.0.0</crysl.version>
-		<spdsVersion>2.4</spdsVersion>
+		<spdsVersion>2.5.1</spdsVersion>
 	</properties>
 
 	<build>
